@@ -1,0 +1,11 @@
+node_modules/
+dist/
+frontend/dist/
+coverage/
+.env
+.env.local
+*.sqlite
+*.sqlite3
+*.tsbuildinfo
+.playwright-cli/
+output/playwright/

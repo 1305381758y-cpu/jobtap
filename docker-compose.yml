@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: jobtap-module-c-postgres
+    environment:
+      POSTGRES_USER: jobtap
+      POSTGRES_PASSWORD: jobtap
+      POSTGRES_DB: jobtap
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobtap -d jobtap"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
