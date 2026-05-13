@@ -45,6 +45,7 @@ export class InitialModuleCSchema20260430000000 implements MigrationInterface {
       CREATE TABLE "analytics_events" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "eventType" varchar NOT NULL,
+        "eventSchemaVersion" integer NOT NULL DEFAULT 1,
         "deviceId" varchar NOT NULL,
         "countryCode" varchar(2) NOT NULL,
         "jobId" varchar,

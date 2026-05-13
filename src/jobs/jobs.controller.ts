@@ -12,12 +12,13 @@ import {
 import { Request } from 'express';
 import { JobSource, JobStatus } from '../database/entities/job.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OwnerGuard } from '../auth/owner.guard';
 import { CreateAdminJobDto, JobFieldsDto } from './dto/job-fields';
 import { RejectJobDto } from './dto/reject-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { JobsService } from './jobs.service';
 
-type AuthenticatedRequest = Request & { admin: { sub: string; email: string } };
+type AuthenticatedRequest = Request & { admin: { sub: string; email: string; role: string } };
 
 @Controller('api/employer/jobs')
 export class EmployerJobsController {
@@ -34,9 +35,56 @@ export class MobileJobsController {
   constructor(private readonly jobsService: JobsService) {}
 
   @Get('bootstrap')
-  bootstrap(@Query('countryCode') countryCode?: string) {
+  bootstrap(
+    @Query('countryCode') countryCode?: string,
+    @Query('deviceCountryCode') deviceCountryCode?: string,
+    @Req() req?: Request,
+  ) {
+    const normalizeCountryCode = (value: string | undefined | null): string | null => {
+      if (!value || value.trim().length === 0) return null;
+      const upper = value.trim().toUpperCase();
+      if (upper.length !== 2) return null;
+      if (!/^[A-Z]{2}$/.test(upper)) return null;
+      if (upper === 'XX' || upper === 'T1') return null;
+      return upper;
+    };
+
+    const deviceQuery = normalizeCountryCode(countryCode) ?? normalizeCountryCode(deviceCountryCode);
+    if (deviceQuery) {
+      return {
+        countryCode: deviceQuery,
+        countrySource: 'device',
+        supportedLocales: ['en', 'zh', 'es', 'fr', 'de', 'pt', 'ja', 'ko', 'ar', 'hi'],
+        appConfig: { contactLinkMode: 'external' },
+      };
+    }
+
+    const ipHeaderKeys = [
+      'cf-ipcountry',
+      'x-vercel-ip-country',
+      'cloudfront-viewer-country',
+      'x-appengine-country',
+      'x-country-code',
+    ];
+    const headers = req?.headers ?? {};
+    for (const key of ipHeaderKeys) {
+      const headerValue = headers[key];
+      const headerCountry = normalizeCountryCode(
+        typeof headerValue === 'string' ? headerValue : undefined,
+      );
+      if (headerCountry) {
+        return {
+          countryCode: headerCountry,
+          countrySource: 'ip',
+          supportedLocales: ['en', 'zh', 'es', 'fr', 'de', 'pt', 'ja', 'ko', 'ar', 'hi'],
+          appConfig: { contactLinkMode: 'external' },
+        };
+      }
+    }
+
     return {
-      countryCode: countryCode?.toUpperCase() ?? null,
+      countryCode: null,
+      countrySource: null,
       supportedLocales: ['en', 'zh', 'es', 'fr', 'de', 'pt', 'ja', 'ko', 'ar', 'hi'],
       appConfig: { contactLinkMode: 'external' },
     };
@@ -99,6 +147,7 @@ export class AdminJobsController {
   }
 
   @Post(':id/remove')
+  @UseGuards(JwtAuthGuard, OwnerGuard)
   remove(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     return this.jobsService.removeJob(id, req.admin.sub);
   }

@@ -5,6 +5,7 @@ import { AdminUser } from '../database/entities/admin-user.entity';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { OwnerGuard } from './owner.guard';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard],
-  exports: [JwtAuthGuard, JwtModule, TypeOrmModule],
+  providers: [AuthService, JwtAuthGuard, OwnerGuard],
+  exports: [JwtAuthGuard, OwnerGuard, JwtModule, TypeOrmModule],
 })
 export class AuthModule {}

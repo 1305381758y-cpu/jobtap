@@ -19,6 +19,9 @@ export class AnalyticsEvent {
   @Column({ type: 'varchar' })
   eventType: AnalyticsEventType;
 
+  @Column({ default: 1 })
+  eventSchemaVersion: number;
+
   @Column()
   deviceId: string;
 

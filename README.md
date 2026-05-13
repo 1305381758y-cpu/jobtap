@@ -70,6 +70,20 @@ npm run admin:build
 
 Admin endpoints require `Authorization: Bearer <accessToken>` from `POST /api/admin/login`.
 
+### Analytics Events
+
+`POST /api/mobile/analytics/events` requires `eventSchemaVersion: 1`. The endpoint rejects suspicious device IDs and applies a basic per-device in-memory rate limit controlled by `ANALYTICS_RATE_LIMIT_PER_MINUTE`.
+
+Admin statistics are aggregated in SQL with `COUNT DISTINCT` by `countryCode`, `jobId`, and `deviceId` instead of loading raw events into application memory.
+
+### Admin Roles
+
+Admin JWTs carry `owner` or `operator`. Both roles can use normal review and read workflows. Owner-only actions are:
+
+- `POST /api/admin/users`
+- `PATCH /api/admin/users/:id`
+- `POST /api/admin/jobs/:id/remove`
+
 ## Admin Console
 
 The React/Vite admin console lives in `frontend/`.

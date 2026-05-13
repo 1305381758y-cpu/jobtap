@@ -1,6 +1,6 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, FindOptionsWhere, MoreThanOrEqual, Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import {
   AnalyticsEvent,
   AnalyticsEventType,
@@ -15,14 +15,27 @@ type StatisticsQuery = {
   endDate?: string;
 };
 
+type StatisticsRow = {
+  countryCode: string;
+  jobId: string;
+  activeUsers: string | number;
+  detailViews: string | number;
+  contactClicks: string | number;
+};
+
 @Injectable()
 export class AnalyticsService {
+  private readonly deviceWindows = new Map<string, number[]>();
+
   constructor(
     @InjectRepository(AnalyticsEvent)
     private readonly events: Repository<AnalyticsEvent>,
   ) {}
 
   async ingest(dto: CreateAnalyticsEventDto): Promise<AnalyticsEvent> {
+    this.assertAllowedDevice(dto.deviceId);
+    this.assertWithinRateLimit(dto.deviceId);
+
     if (
       [AnalyticsEventType.JobDetailView, AnalyticsEventType.ContactClick].includes(dto.eventType) &&
       !dto.jobId
@@ -40,78 +53,112 @@ export class AnalyticsService {
   }
 
   async statistics(query: StatisticsQuery): Promise<{ items: Array<Record<string, unknown>> }> {
-    const where = this.buildWhere(query);
-    const events = await this.events.find({ where });
-    const activeUsersByCountry = new Map<string, Set<string>>();
-    const detailDevices = new Map<string, Set<string>>();
-    const clickDevices = new Map<string, Set<string>>();
+    const rows = await this.buildStatisticsQuery(query).getRawMany<StatisticsRow>();
 
-    for (const event of events) {
-      this.addToSet(activeUsersByCountry, event.countryCode, event.deviceId);
+    return {
+      items: rows.map((row) => {
+        const detailViews = Number(row.detailViews);
+        const contactClicks = Number(row.contactClicks);
+        return {
+          countryCode: row.countryCode,
+          activeUsers: Number(row.activeUsers),
+          jobId: row.jobId,
+          detailViews,
+          contactClicks,
+          contactClickRate: detailViews === 0 ? null : contactClicks / detailViews,
+        };
+      }),
+    };
+  }
 
-      if (!event.jobId) continue;
-      const key = `${event.countryCode}:${event.jobId}`;
+  private buildStatisticsQuery(query: StatisticsQuery): SelectQueryBuilder<AnalyticsEvent> {
+    const qb = this.events
+      .createQueryBuilder('event')
+      .select('event.countryCode', 'countryCode')
+      .addSelect('event.jobId', 'jobId')
+      .addSelect('COUNT(DISTINCT event.deviceId)', 'activeUsers')
+      .addSelect(
+        'COUNT(DISTINCT CASE WHEN event.eventType = :detailType THEN event.deviceId END)',
+        'detailViews',
+      )
+      .addSelect(
+        'COUNT(DISTINCT CASE WHEN event.eventType = :clickType THEN event.deviceId END)',
+        'contactClicks',
+      )
+      .where('event.jobId IS NOT NULL')
+      .groupBy('event.countryCode')
+      .addGroupBy('event.jobId')
+      .orderBy('event.countryCode', 'ASC')
+      .addOrderBy('event.jobId', 'ASC')
+      .setParameters({
+        detailType: AnalyticsEventType.JobDetailView,
+        clickType: AnalyticsEventType.ContactClick,
+      });
 
-      if (event.eventType === AnalyticsEventType.JobDetailView) {
-        this.addToSet(detailDevices, key, event.deviceId);
-      }
-      if (event.eventType === AnalyticsEventType.ContactClick) {
-        this.addToSet(clickDevices, key, event.deviceId);
-      }
+    this.applyStatisticsFilters(qb, query);
+    return qb;
+  }
+
+  private applyStatisticsFilters(
+    qb: SelectQueryBuilder<AnalyticsEvent>,
+    query: StatisticsQuery,
+  ): void {
+    if (query.countryCode) {
+      qb.andWhere('event.countryCode = :countryCode', { countryCode: query.countryCode.toUpperCase() });
+    }
+    if (query.jobId) {
+      qb.andWhere('event.jobId = :jobId', { jobId: query.jobId });
     }
 
-    const keys = new Set([...detailDevices.keys(), ...clickDevices.keys()]);
-    const items = [...keys].sort().map((key) => {
-      const [countryCode, jobId] = key.split(':');
-      const detailViews = detailDevices.get(key)?.size ?? 0;
-      const contactClicks = clickDevices.get(key)?.size ?? 0;
-      return {
-        countryCode,
-        activeUsers: activeUsersByCountry.get(countryCode)?.size ?? 0,
-        jobId,
-        detailViews,
-        contactClicks,
-        contactClickRate: detailViews === 0 ? null : contactClicks / detailViews,
-      };
-    });
-
-    return { items };
-  }
-
-  private buildWhere(query: StatisticsQuery): FindOptionsWhere<AnalyticsEvent> {
-    const where: FindOptionsWhere<AnalyticsEvent> = {};
-    if (query.countryCode) where.countryCode = query.countryCode.toUpperCase();
-    if (query.jobId) where.jobId = query.jobId;
-
-    const createdAt = this.resolveDateFilter(query);
-    if (createdAt) where.createdAt = createdAt;
-    return where;
-  }
-
-  private resolveDateFilter(query: StatisticsQuery) {
     if (query.startDate && query.endDate) {
-      return Between(new Date(query.startDate), new Date(query.endDate));
+      qb.andWhere('event.createdAt BETWEEN :startDate AND :endDate', {
+        startDate: new Date(query.startDate),
+        endDate: new Date(query.endDate),
+      });
+      return;
     }
 
+    const startDate = this.resolveStartDate(query);
+    if (startDate) qb.andWhere('event.createdAt >= :startDate', { startDate });
+  }
+
+  private resolveStartDate(query: StatisticsQuery): Date | undefined {
     const now = new Date();
     if (query.range === 'today') {
       const start = new Date(now);
       start.setHours(0, 0, 0, 0);
-      return MoreThanOrEqual(start);
+      return start;
     }
     if (query.range === 'last7') {
-      return MoreThanOrEqual(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
+      return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     }
     if (query.range === 'last30') {
-      return MoreThanOrEqual(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
+      return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     }
 
     return undefined;
   }
 
-  private addToSet(map: Map<string, Set<string>>, key: string, value: string): void {
-    const current = map.get(key) ?? new Set<string>();
-    current.add(value);
-    map.set(key, current);
+  private assertAllowedDevice(deviceId: string): void {
+    if (/^(.)\1{7,}$/.test(deviceId)) {
+      throw new BadRequestException('suspicious deviceId');
+    }
+  }
+
+  private assertWithinRateLimit(deviceId: string): void {
+    const maxEvents = Number(process.env.ANALYTICS_RATE_LIMIT_PER_MINUTE ?? 60);
+    const now = Date.now();
+    const windowStart = now - 60_000;
+    const recentEvents = (this.deviceWindows.get(deviceId) ?? []).filter(
+      (timestamp) => timestamp > windowStart,
+    );
+
+    if (recentEvents.length >= maxEvents) {
+      this.deviceWindows.set(deviceId, recentEvents);
+      throw new HttpException('analytics rate limit exceeded', HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    recentEvents.push(now);
+    this.deviceWindows.set(deviceId, recentEvents);
   }
 }

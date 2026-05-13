@@ -1,13 +1,19 @@
 import { FormEvent, ReactNode, useEffect, useState } from 'react';
 import {
+  ArrowLeft,
   AlertCircle,
   BarChart3,
+  BadgeCheck,
   BriefcaseBusiness,
+  Clock3,
   CheckCircle2,
+  Globe2,
   LogOut,
   Plus,
   Settings,
   ShieldCheck,
+  Send,
+  Sparkles,
 } from 'lucide-react';
 import {
   AdminPayload,
@@ -15,6 +21,7 @@ import {
   AdminStatus,
   AdminUser,
   ApiError,
+  EmployerJobPayload,
   Job,
   JobPayload,
   JobStatus,
@@ -25,15 +32,22 @@ import {
   listAdmins,
   listJobs,
   login,
+  submitEmployerJob,
   rejectJob,
   removeJob,
   updateAdmin,
   updateJob,
   StatisticsItem,
 } from './api';
+import { t, DEFAULT_ADMIN_LOCALE } from './i18n';
+import { validateContactLink } from './contactLinkPolicy';
+import type { SupportedLocale } from './i18n';
 
 type Page = 'review' | 'jobs' | 'statistics' | 'settings';
+type View = 'admin' | 'submit';
 type Session = { token: string; email: string; role: AdminRole };
+type EmployerJobForm = Omit<EmployerJobPayload, 'city'> & { city: string };
+type EmployerJobFormErrors = Partial<Record<keyof EmployerJobForm, string>>;
 
 const initialJobForm: JobPayload = {
   title: '',
@@ -48,6 +62,18 @@ const initialJobForm: JobPayload = {
   status: 'pending',
 };
 
+const initialEmployerJobForm: EmployerJobForm = {
+  title: '',
+  employerName: '',
+  countryCode: 'US',
+  city: '',
+  isRemote: false,
+  salaryText: '',
+  workTimeText: '',
+  description: '',
+  contactUrl: '',
+};
+
 const initialAdminForm: AdminPayload = {
   email: '',
   password: '',
@@ -55,22 +81,24 @@ const initialAdminForm: AdminPayload = {
   status: 'active',
 };
 
+const adminLocale: SupportedLocale = DEFAULT_ADMIN_LOCALE;
+
 const roleLabel: Record<AdminRole, string> = {
-  owner: '超级管理员',
-  operator: '运营管理员',
+  owner: t(adminLocale, 'role.owner'),
+  operator: t(adminLocale, 'role.operator'),
 };
 
 const adminStatusLabel: Record<AdminStatus, string> = {
-  active: '启用',
-  disabled: '停用',
+  active: t(adminLocale, 'adminStatus.active'),
+  disabled: t(adminLocale, 'adminStatus.disabled'),
 };
 
 const jobStatusLabel: Record<JobStatus, string> = {
-  draft: '草稿',
-  pending: '待审核',
-  approved: '已通过',
-  rejected: '已拒绝',
-  removed: '已移除',
+  draft: t(adminLocale, 'jobStatus.draft'),
+  pending: t(adminLocale, 'jobStatus.pending'),
+  approved: t(adminLocale, 'jobStatus.approved'),
+  rejected: t(adminLocale, 'jobStatus.rejected'),
+  removed: t(adminLocale, 'jobStatus.removed'),
 };
 
 function parseSession(token: string): Session | null {
@@ -80,6 +108,47 @@ function parseSession(token: string): Session | null {
   } catch {
     return null;
   }
+}
+
+function getInitialView(): View {
+  if (typeof window === 'undefined') return 'admin';
+  const search = new URLSearchParams(window.location.search);
+  if (search.get('mode') === 'submit' || window.location.pathname === '/submit') return 'submit';
+  return 'admin';
+}
+
+function normalizeEmployerJobForm(form: EmployerJobForm): EmployerJobPayload {
+  return {
+    ...form,
+    title: form.title.trim(),
+    employerName: form.employerName.trim(),
+    countryCode: form.countryCode.trim().toUpperCase(),
+    city: form.city.trim() || undefined,
+    salaryText: form.salaryText.trim(),
+    workTimeText: form.workTimeText.trim(),
+    description: form.description.trim(),
+    contactUrl: form.contactUrl.trim(),
+  };
+}
+
+function validateEmployerJobForm(form: EmployerJobPayload): EmployerJobFormErrors {
+  const errors: EmployerJobFormErrors = {};
+  if (form.title.trim().length < 2) errors.title = '请输入至少 2 个字符的职位标题';
+  if (form.employerName.trim().length < 2) errors.employerName = '请输入雇主名称';
+  if (!/^[A-Z]{2}$/.test(form.countryCode.trim().toUpperCase())) errors.countryCode = '请输入 2 位国家代码，例如 US';
+  if ((form.city ?? '').trim().length > 120) errors.city = '城市名不能超过 120 个字符';
+  if (!form.salaryText.trim()) errors.salaryText = '请输入薪资信息';
+  if (!form.workTimeText.trim()) errors.workTimeText = '请输入工时或班次信息';
+  if (form.description.trim().length < 10) errors.description = '职位描述至少需要 10 个字符';
+  if (!form.contactUrl.trim()) {
+    errors.contactUrl = '请输入联系链接';
+  } else {
+    const result = validateContactLink(form.contactUrl.trim());
+    if (result) {
+      errors.contactUrl = result;
+    }
+  }
+  return errors;
 }
 
 function formatDate(value?: string | null) {
@@ -101,6 +170,7 @@ function statusClass(status: string) {
 }
 
 function App() {
+  const [view] = useState<View>(getInitialView);
   const [session, setSession] = useState<Session | null>(() => {
     const token = localStorage.getItem('jobtap_admin_token');
     return token ? parseSession(token) : null;
@@ -114,6 +184,10 @@ function App() {
     window.addEventListener('jobtap:unauthorized', clearInvalidSession);
     return () => window.removeEventListener('jobtap:unauthorized', clearInvalidSession);
   }, []);
+
+  if (view === 'submit') {
+    return <EmployerSubmissionPage />;
+  }
 
   if (!session) {
     return <LoginScreen onLogin={setSession} />;
@@ -166,7 +240,232 @@ function LoginScreen({ onLogin }: { onLogin: (session: Session) => void }) {
         <button className="primary-button" disabled={loading}>
           {loading ? '登录中...' : '登录'}
         </button>
+        <a className="text-link" href="/?mode=submit">
+          招聘方公开提交入口
+        </a>
       </form>
+    </main>
+  );
+}
+
+function EmployerSubmissionPage() {
+  const [form, setForm] = useState<EmployerJobForm>(initialEmployerJobForm);
+  const [errors, setErrors] = useState<EmployerJobFormErrors>({});
+  const [submitError, setSubmitError] = useState('');
+  const [submittedJob, setSubmittedJob] = useState<Job | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  function updateField<K extends keyof EmployerJobForm>(key: K, value: EmployerJobForm[K]) {
+    setForm((current) => ({ ...current, [key]: value }));
+    setErrors((current) => ({ ...current, [key]: undefined }));
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const normalized = normalizeEmployerJobForm(form);
+    const nextErrors = validateEmployerJobForm(normalized);
+    setErrors(nextErrors);
+    setSubmitError('');
+    if (Object.keys(nextErrors).length > 0) return;
+
+    setLoading(true);
+    try {
+      const job = await submitEmployerJob(normalized);
+      setSubmittedJob(job);
+      setForm(initialEmployerJobForm);
+      setErrors({});
+    } catch (err) {
+      setSubmitError(err instanceof ApiError ? err.message : '提交失败，请稍后再试');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="public-page">
+      <div className="public-shell">
+        <section className="public-hero">
+          <a className="text-link hero-back" href="/">
+            <ArrowLeft size={16} />
+            返回后台
+          </a>
+          <div className="hero-badge">
+            <Sparkles size={14} />
+            招聘方公开提交页
+          </div>
+          <h1>把职位直接交给我们审核</h1>
+          <p className="hero-copy">
+            填完后会直接进入审核队列。我们会检查职位信息、联系链接和发布内容，审核通过后再进入站内展示。
+          </p>
+          <div className="hero-points">
+            <div>
+              <BadgeCheck size={18} />
+              <span>公开可访问，适合快速投递</span>
+            </div>
+            <div>
+              <Clock3 size={18} />
+              <span>提交后进入待审核状态</span>
+            </div>
+            <div>
+              <Globe2 size={18} />
+              <span>支持远程和本地职位</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="public-card">
+          {submittedJob ? (
+            <div className="success-card">
+              <div className="success-icon">
+                <CheckCircle2 size={22} />
+              </div>
+              <div>
+                <h2>已收到提交</h2>
+                <p>
+                  {submittedJob.title} 已进入审核队列。我们会尽快处理，职位 ID 为
+                  <span className="mono-inline"> {submittedJob.id.slice(0, 8)}</span>。
+                </p>
+              </div>
+              <button className="secondary-button" onClick={() => setSubmittedJob(null)}>
+                再提交一条
+              </button>
+            </div>
+          ) : null}
+
+          <div className="public-card-header">
+            <div>
+              <span className="eyebrow">职位信息</span>
+              <h2>招聘方提交表单</h2>
+            </div>
+            <span className="chip chip-warning">审核后发布</span>
+          </div>
+
+          {submitError ? <div className="form-error"><AlertCircle size={16} />{submitError}</div> : null}
+
+          <form className="public-form" onSubmit={submit}>
+            <div className="form-grid">
+              <label>
+                <span>职位标题 *</span>
+                <input
+                  required
+                  value={form.title}
+                  onChange={(event) => updateField('title', event.target.value)}
+                  aria-invalid={Boolean(errors.title)}
+                  placeholder="例如 Senior Frontend Engineer"
+                />
+                {errors.title ? <small>{errors.title}</small> : null}
+              </label>
+              <label>
+                <span>雇主名称 *</span>
+                <input
+                  required
+                  value={form.employerName}
+                  onChange={(event) => updateField('employerName', event.target.value)}
+                  aria-invalid={Boolean(errors.employerName)}
+                  placeholder="公司或团队名称"
+                />
+                {errors.employerName ? <small>{errors.employerName}</small> : null}
+              </label>
+            </div>
+
+            <div className="form-grid">
+              <label>
+                <span>国家代码 *</span>
+                <input
+                  required
+                  maxLength={2}
+                  value={form.countryCode}
+                  onChange={(event) => updateField('countryCode', event.target.value.toUpperCase())}
+                  aria-invalid={Boolean(errors.countryCode)}
+                  placeholder="US"
+                />
+                {errors.countryCode ? <small>{errors.countryCode}</small> : null}
+              </label>
+              <label>
+                <span>城市</span>
+                <input
+                  value={form.city}
+                  onChange={(event) => updateField('city', event.target.value)}
+                  aria-invalid={Boolean(errors.city)}
+                  placeholder="New York / 北京 / Remote"
+                />
+                {errors.city ? <small>{errors.city}</small> : null}
+              </label>
+            </div>
+
+            <div className="form-grid">
+              <label className="checkbox-field">
+                <input
+                  type="checkbox"
+                  checked={form.isRemote}
+                  onChange={(event) => updateField('isRemote', event.target.checked)}
+                />
+                <span>这是远程职位</span>
+              </label>
+              <div className="field-note">
+                远程职位会在审核时做标记，便于站内展示。
+              </div>
+            </div>
+
+            <div className="form-grid">
+              <label>
+                <span>薪资说明 *</span>
+                <input
+                  required
+                  value={form.salaryText}
+                  onChange={(event) => updateField('salaryText', event.target.value)}
+                  aria-invalid={Boolean(errors.salaryText)}
+                  placeholder="例如 $3k-$5k / 月"
+                />
+                {errors.salaryText ? <small>{errors.salaryText}</small> : null}
+              </label>
+              <label>
+                <span>工时说明 *</span>
+                <input
+                  required
+                  value={form.workTimeText}
+                  onChange={(event) => updateField('workTimeText', event.target.value)}
+                  aria-invalid={Boolean(errors.workTimeText)}
+                  placeholder="例如 Full-time / 9:00-18:00"
+                />
+                {errors.workTimeText ? <small>{errors.workTimeText}</small> : null}
+              </label>
+            </div>
+
+            <label>
+              <span>联系链接 *</span>
+              <input
+                required
+                value={form.contactUrl}
+                onChange={(event) => updateField('contactUrl', event.target.value)}
+                aria-invalid={Boolean(errors.contactUrl)}
+                placeholder="https://..."
+              />
+              {errors.contactUrl ? <small>{errors.contactUrl}</small> : null}
+            </label>
+
+            <label>
+              <span>职位描述 *</span>
+              <textarea
+                required
+                value={form.description}
+                onChange={(event) => updateField('description', event.target.value)}
+                aria-invalid={Boolean(errors.description)}
+                placeholder="介绍岗位职责、要求、团队背景、福利等"
+              />
+              {errors.description ? <small>{errors.description}</small> : null}
+            </label>
+
+            <div className="public-form-footer">
+              <p>提交后会先进入审核队列，不会立即公开展示。</p>
+              <button className="primary-button inline submit-button" disabled={loading}>
+                <Send size={16} />
+                {loading ? '提交中...' : '提交职位'}
+              </button>
+            </div>
+          </form>
+        </section>
+      </div>
     </main>
   );
 }

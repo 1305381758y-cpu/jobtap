@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Request } from 'express';
 import { Repository } from 'typeorm';
-import { AdminStatus, AdminUser } from '../database/entities/admin-user.entity';
+import { AdminRole, AdminStatus, AdminUser } from '../database/entities/admin-user.entity';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -22,12 +22,12 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      const payload = await this.jwtService.verifyAsync<{ sub: string; email: string; role: string }>(token);
+      const payload = await this.jwtService.verifyAsync<{ sub: string; email: string; role: AdminRole }>(token);
       const admin = await this.admins.findOne({ where: { id: payload.sub } });
       if (!admin || admin.status !== AdminStatus.Active) {
         throw new UnauthorizedException('Invalid bearer token');
       }
-      req.admin = payload;
+      req.admin = { sub: admin.id, email: admin.email, role: admin.role };
       return true;
     } catch {
       throw new UnauthorizedException('Invalid bearer token');

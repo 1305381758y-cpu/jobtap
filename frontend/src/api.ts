@@ -55,6 +55,8 @@ export type JobPayload = {
   status?: JobStatus;
 };
 
+export type EmployerJobPayload = Omit<JobPayload, 'status'>;
+
 export type AdminPayload = {
   email: string;
   password: string;
@@ -114,6 +116,10 @@ export function listJobs(token: string, filters: Record<string, string>) {
 
 export function createJob(token: string, payload: JobPayload) {
   return request<Job>('/api/admin/jobs', { method: 'POST', body: JSON.stringify(payload) }, token);
+}
+
+export function submitEmployerJob(payload: EmployerJobPayload) {
+  return request<Job>('/api/employer/jobs', { method: 'POST', body: JSON.stringify(payload) });
 }
 
 export function updateJob(token: string, id: string, payload: Partial<JobPayload>) {

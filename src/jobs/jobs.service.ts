@@ -6,7 +6,48 @@ import { CreateAdminJobDto, JobFieldsDto } from './dto/job-fields';
 import { RejectJobDto } from './dto/reject-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 
-const BLOCKED_CONTACT_PROTOCOLS = new Set(['javascript:', 'data:', 'vbscript:', 'file:']);
+const BLOCKED_CONTACT_PROTOCOLS = new Set([
+  'javascript:',
+  'data:',
+  'vbscript:',
+  'file:',
+  'content:',
+  'about:',
+  'ftp:',
+]);
+
+function isContactLinkValid(url: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return 'Contact link must be a valid URL or URI';
+  }
+
+  if (BLOCKED_CONTACT_PROTOCOLS.has(parsed.protocol)) {
+    return 'Contact link protocol is not allowed';
+  }
+
+  const scheme = parsed.protocol.slice(0, -1).toLowerCase();
+
+  if (scheme === 'http' || scheme === 'https') {
+    if (!parsed.hostname || parsed.hostname.length === 0) {
+      return 'Contact link must have a host';
+    }
+  } else if (scheme === 'mailto' || scheme === 'tel' || scheme === 'sms') {
+    const ssp = url.slice(url.indexOf(':') + 1);
+    if (!ssp || ssp.length === 0) {
+      return 'Contact link scheme-specific part must not be empty';
+    }
+  } else {
+    const ssp = url.slice(url.indexOf(':') + 1);
+    if (!ssp || ssp.length === 0) {
+      return 'Contact link scheme-specific part must not be empty';
+    }
+  }
+
+  return null;
+}
 
 @Injectable()
 export class JobsService {
@@ -153,15 +194,9 @@ export class JobsService {
   }
 
   private assertAllowedContactUrl(contactUrl: string): void {
-    let parsed: URL;
-    try {
-      parsed = new URL(contactUrl);
-    } catch {
-      throw new BadRequestException('Contact link must be a valid URL or URI');
-    }
-
-    if (BLOCKED_CONTACT_PROTOCOLS.has(parsed.protocol)) {
-      throw new BadRequestException('Contact link protocol is not allowed');
+    const error = isContactLinkValid(contactUrl);
+    if (error) {
+      throw new BadRequestException(error);
     }
   }
 }

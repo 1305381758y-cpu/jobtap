@@ -1,13 +1,18 @@
-import { IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { AnalyticsEventType } from '../../database/entities/analytics-event.entity';
 
 export class CreateAnalyticsEventDto {
   @IsIn(Object.values(AnalyticsEventType))
   eventType: AnalyticsEventType;
 
+  @IsInt()
+  @IsIn([1])
+  eventSchemaVersion: number;
+
   @IsString()
-  @MinLength(1)
-  @MaxLength(200)
+  @MinLength(8)
+  @MaxLength(128)
+  @Matches(/^[A-Za-z0-9._:-]+$/)
   deviceId: string;
 
   @Matches(/^[A-Z]{2}$/)

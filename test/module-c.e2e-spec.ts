@@ -124,6 +124,7 @@ describe('JobTap Module C', () => {
       countryCode: 'US',
       platform: 'ios',
       jobId: job.body.id,
+      eventSchemaVersion: 1,
     };
 
     await request(app.getHttpServer())
@@ -211,6 +212,94 @@ describe('JobTap Module C', () => {
       .get('/api/admin/jobs')
       .set('Authorization', `Bearer ${opsLogin.body.accessToken}`)
       .expect(401);
+  });
+
+  it('rejects unsupported or suspicious analytics events and rate-limits noisy devices', async () => {
+    const validEvent = {
+      eventType: 'app_open',
+      deviceId: 'rate-device-1',
+      countryCode: 'US',
+      platform: 'ios',
+      eventSchemaVersion: 1,
+    };
+
+    await request(app.getHttpServer())
+      .post('/api/mobile/analytics/events')
+      .send({ ...validEvent, eventSchemaVersion: 99 })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post('/api/mobile/analytics/events')
+      .send({ ...validEvent, deviceId: 'bot' })
+      .expect(400);
+
+    for (let index = 0; index < 60; index += 1) {
+      await request(app.getHttpServer())
+        .post('/api/mobile/analytics/events')
+        .send(validEvent)
+        .expect(201);
+    }
+
+    await request(app.getHttpServer())
+      .post('/api/mobile/analytics/events')
+      .send(validEvent)
+      .expect(429);
+  });
+
+  it('keeps operator admins away from owner-only account and destructive job actions', async () => {
+    const operator = await request(app.getHttpServer())
+      .post('/api/admin/users')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        email: 'limited-ops@jobtap.test',
+        password: 'password123',
+        role: 'operator',
+        status: 'active',
+      })
+      .expect(201);
+
+    const operatorLogin = await request(app.getHttpServer())
+      .post('/api/admin/login')
+      .send({ email: 'limited-ops@jobtap.test', password: 'password123' })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/api/admin/users')
+      .set('Authorization', `Bearer ${operatorLogin.body.accessToken}`)
+      .send({
+        email: 'blocked@jobtap.test',
+        password: 'password123',
+        role: 'operator',
+        status: 'active',
+      })
+      .expect(403);
+
+    const job = await request(app.getHttpServer())
+      .post('/api/admin/jobs')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: 'Owner removal check',
+        employerName: 'AccessWorks',
+        countryCode: 'US',
+        isRemote: false,
+        salaryText: '$19/hour',
+        workTimeText: 'Weekdays',
+        description: 'Temporary job for permission testing.',
+        contactUrl: 'https://example.com/remove-check',
+        status: 'approved',
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/api/admin/jobs/${job.body.id}/remove`)
+      .set('Authorization', `Bearer ${operatorLogin.body.accessToken}`)
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .patch(`/api/admin/users/${operator.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'disabled' })
+      .expect(200);
   });
 
   it('protects admin jobs and supports review filters plus partial job id search', async () => {
@@ -305,5 +394,222 @@ describe('JobTap Module C', () => {
       .query({ countryCode: 'GB' })
       .expect(200)
       .expect(({ body }) => expect(body.items).toHaveLength(0));
+  });
+
+  describe('GET /api/mobile/bootstrap country detection', () => {
+    it('device query countryCode wins over IP header', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/mobile/bootstrap')
+        .query({ countryCode: 'DE' })
+        .set('cf-ipcountry', 'US')
+        .expect(200);
+
+      expect(res.body).toMatchObject({
+        countryCode: 'DE',
+        countrySource: 'device',
+      });
+      expect(res.body.supportedLocales).toBeDefined();
+      expect(res.body.appConfig).toBeDefined();
+    });
+
+    it('device countryCode normalizes to uppercase', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/mobile/bootstrap')
+        .query({ countryCode: 'gb' })
+        .expect(200);
+
+      expect(res.body.countryCode).toBe('GB');
+      expect(res.body.countrySource).toBe('device');
+    });
+
+    it('deviceCountryCode query param is accepted as fallback', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/mobile/bootstrap')
+        .query({ deviceCountryCode: 'JP' })
+        .expect(200);
+
+      expect(res.body.countryCode).toBe('JP');
+      expect(res.body.countrySource).toBe('device');
+    });
+
+    it('IP header fallback works when no query param provided', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/mobile/bootstrap')
+        .set('cf-ipcountry', 'FR')
+        .expect(200);
+
+      expect(res.body.countryCode).toBe('FR');
+      expect(res.body.countrySource).toBe('ip');
+    });
+
+    it('x-vercel-ip-country header fallback works', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/mobile/bootstrap')
+        .set('x-vercel-ip-country', 'BR')
+        .expect(200);
+
+      expect(res.body.countryCode).toBe('BR');
+      expect(res.body.countrySource).toBe('ip');
+    });
+
+    it('cloudfront-viewer-country header fallback works', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/mobile/bootstrap')
+        .set('cloudfront-viewer-country', 'AU')
+        .expect(200);
+
+      expect(res.body.countryCode).toBe('AU');
+      expect(res.body.countrySource).toBe('ip');
+    });
+
+    it('x-appengine-country header fallback works', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/mobile/bootstrap')
+        .set('x-appengine-country', 'IN')
+        .expect(200);
+
+      expect(res.body.countryCode).toBe('IN');
+      expect(res.body.countrySource).toBe('ip');
+    });
+
+    it('x-country-code header fallback works', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/mobile/bootstrap')
+        .set('x-country-code', 'KR')
+        .expect(200);
+
+      expect(res.body.countryCode).toBe('KR');
+      expect(res.body.countrySource).toBe('ip');
+    });
+
+    it('invalid XX country code returns null', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/mobile/bootstrap')
+        .query({ countryCode: 'XX' })
+        .expect(200);
+
+      expect(res.body.countryCode).toBeNull();
+      expect(res.body.countrySource).toBeNull();
+    });
+
+    it('invalid T1 country code returns null', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/mobile/bootstrap')
+        .query({ countryCode: 'T1' })
+        .expect(200);
+
+      expect(res.body.countryCode).toBeNull();
+      expect(res.body.countrySource).toBeNull();
+    });
+
+    it('empty country code returns null', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/mobile/bootstrap')
+        .query({ countryCode: '' })
+        .expect(200);
+
+      expect(res.body.countryCode).toBeNull();
+      expect(res.body.countrySource).toBeNull();
+    });
+
+    it('single-char country code returns null', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/mobile/bootstrap')
+        .query({ countryCode: 'U' })
+        .expect(200);
+
+      expect(res.body.countryCode).toBeNull();
+      expect(res.body.countrySource).toBeNull();
+    });
+
+    it('three-char country code returns null', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/mobile/bootstrap')
+        .query({ countryCode: 'USA' })
+        .expect(200);
+
+      expect(res.body.countryCode).toBeNull();
+      expect(res.body.countrySource).toBeNull();
+    });
+
+    it('non-alpha country code returns null', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/mobile/bootstrap')
+        .query({ countryCode: '1!' })
+        .expect(200);
+
+      expect(res.body.countryCode).toBeNull();
+      expect(res.body.countrySource).toBeNull();
+    });
+
+    it('no query param and no IP headers returns null', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/mobile/bootstrap')
+        .expect(200);
+
+      expect(res.body.countryCode).toBeNull();
+      expect(res.body.countrySource).toBeNull();
+    });
+  });
+
+  describe('contact link validation', () => {
+    const validJob = {
+      title: 'Test position',
+      employerName: 'Test Corp',
+      countryCode: 'US',
+      isRemote: false,
+      salaryText: '$20/hr',
+      workTimeText: 'Weekdays',
+      description: 'A test job with enough characters to pass.',
+    };
+
+    it('rejects ftp://', async () => {
+      await request(app.getHttpServer())
+        .post('/api/employer/jobs')
+        .send({ ...validJob, contactUrl: 'ftp://files.example.com' })
+        .expect(400);
+    });
+
+    it('rejects content://', async () => {
+      await request(app.getHttpServer())
+        .post('/api/employer/jobs')
+        .send({ ...validJob, contactUrl: 'content://com.android.contacts' })
+        .expect(400);
+    });
+
+    it('rejects about:blank', async () => {
+      await request(app.getHttpServer())
+        .post('/api/employer/jobs')
+        .send({ ...validJob, contactUrl: 'about:blank' })
+        .expect(400);
+    });
+
+    it('rejects vbscript:', async () => {
+      await request(app.getHttpServer())
+        .post('/api/employer/jobs')
+        .send({ ...validJob, contactUrl: "vbscript:msgbox('xss')" })
+        .expect(400);
+    });
+
+    it('rejects http with missing host', async () => {
+      await request(app.getHttpServer())
+        .post('/api/employer/jobs')
+        .send({ ...validJob, contactUrl: 'http:' })
+        .expect(400);
+    });
+
+    it('accepts sms:+123', async () => {
+      await request(app.getHttpServer())
+        .post('/api/employer/jobs')
+        .send({ ...validJob, contactUrl: 'sms:+1234567890' })
+        .expect(201);
+    });
+
+    it('accepts custom app deep link (whatsapp://)', async () => {
+      await request(app.getHttpServer())
+        .post('/api/employer/jobs')
+        .send({ ...validJob, contactUrl: 'whatsapp://send?phone=123' })
+        .expect(201);
+    });
   });
 });
