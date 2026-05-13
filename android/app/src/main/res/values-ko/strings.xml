@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">JobTap</string>
+    <string name="locale_marker">ko</string>
+</resources>
