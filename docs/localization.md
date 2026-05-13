@@ -3,7 +3,7 @@
 ## Current State
 
 ### Android App
-- All user-facing strings in `MainActivity.kt` have been moved to `res/values/strings.xml` and accessed via `stringResource(R.string.xyz)`.
+- Static strings used by the `MainActivity` display layer (badge labels, time labels) are resource-backed via `stringResource(R.string.xyz)`; the `Job` model and `JobMapper` remain locale-agnostic.
 - Base English strings are defined in `res/values/strings.xml`.
 - Resource directory skeletons exist for all PRD languages but contain only `app_name` and a locale marker; untranslated strings fall back to the base English values via Android resource resolution.
 
@@ -33,7 +33,7 @@
 Android resource resolution automatically falls back to `values/` (English) when a string is not defined in a locale-specific `values-*/strings.xml`. No custom fallback logic is needed.
 
 ### Frontend
-The i18n helper `t(key)` looks up the key in the current locale's catalog. If not found, it falls back to `DEFAULT_ADMIN_LOCALE` (Chinese). If still not found, it returns the key itself.
+The i18n helper `t(locale, key)` looks up the key in the current locale's catalog. If not found, it falls back to `DEFAULT_ADMIN_LOCALE` (Chinese). If still not found, it returns the key itself.
 
 ## Remaining Work
 
