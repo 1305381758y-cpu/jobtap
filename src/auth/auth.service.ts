@@ -1,6 +1,9 @@
 import {
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
   OnModuleInit,
   UnauthorizedException,
@@ -14,8 +17,14 @@ import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { UpdateAdminUserDto } from './dto/update-admin-user.dto';
 
+const LOGIN_FAILURE_LIMIT = 5;
+const LOGIN_FAILURE_WINDOW_MS = 10 * 60 * 1000;
+
 @Injectable()
 export class AuthService implements OnModuleInit {
+  private readonly failedLogins = new Map<string, number[]>();
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(AdminUser) private readonly admins: Repository<AdminUser>,
     private readonly jwtService: JwtService,
@@ -38,19 +47,30 @@ export class AuthService implements OnModuleInit {
     );
   }
 
-  async login(dto: LoginDto): Promise<{ accessToken: string }> {
+  async login(dto: LoginDto, source = 'unknown'): Promise<{ accessToken: string }> {
     const email = dto.email.toLowerCase();
+    const attemptKey = `${source}:${email}`;
+    this.assertLoginAllowed(attemptKey);
+
     const admin = await this.admins.findOne({ where: { email } });
-    if (!admin) throw new UnauthorizedException('Invalid credentials');
+    if (!admin) {
+      this.recordLoginFailure(attemptKey, email, source);
+      throw new UnauthorizedException('Invalid credentials');
+    }
     if (admin.status !== AdminStatus.Active) {
+      this.recordLoginFailure(attemptKey, email, source);
       throw new UnauthorizedException('Admin account disabled');
     }
 
     const valid = await bcrypt.compare(dto.password, admin.passwordHash);
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
+    if (!valid) {
+      this.recordLoginFailure(attemptKey, email, source);
+      throw new UnauthorizedException('Invalid credentials');
+    }
 
     admin.lastLoginAt = new Date();
     await this.admins.save(admin);
+    this.failedLogins.delete(attemptKey);
 
     return {
       accessToken: await this.jwtService.signAsync({
@@ -59,6 +79,25 @@ export class AuthService implements OnModuleInit {
         role: admin.role,
       }),
     };
+  }
+
+  private assertLoginAllowed(attemptKey: string): void {
+    const now = Date.now();
+    const recent = (this.failedLogins.get(attemptKey) ?? []).filter(
+      (timestamp) => now - timestamp < LOGIN_FAILURE_WINDOW_MS,
+    );
+    this.failedLogins.set(attemptKey, recent);
+
+    if (recent.length >= LOGIN_FAILURE_LIMIT) {
+      throw new HttpException('Too many failed login attempts', HttpStatus.TOO_MANY_REQUESTS);
+    }
+  }
+
+  private recordLoginFailure(attemptKey: string, email: string, source: string): void {
+    const recent = this.failedLogins.get(attemptKey) ?? [];
+    recent.push(Date.now());
+    this.failedLogins.set(attemptKey, recent);
+    this.logger.warn({ message: 'Admin login failed', email, source });
   }
 
   async listAdmins(): Promise<Array<Omit<AdminUser, 'passwordHash'>>> {

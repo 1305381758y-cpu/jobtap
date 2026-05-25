@@ -102,6 +102,34 @@ describe('JobTap Module C', () => {
     });
   });
 
+  it('returns health status for deployment probes', async () => {
+    await request(app.getHttpServer())
+      .get('/health')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({ status: 'ok', service: 'jobtap-module-c' });
+        expect(body.timestamp).toEqual(expect.any(String));
+      });
+  });
+
+  it('rate-limits repeated failed admin logins by source and account', async () => {
+    const sourceIp = '198.51.100.24';
+
+    for (let index = 0; index < 5; index += 1) {
+      await request(app.getHttpServer())
+        .post('/api/admin/login')
+        .set('x-forwarded-for', sourceIp)
+        .send({ email: 'admin@jobtap.test', password: 'wrong-password' })
+        .expect(401);
+    }
+
+    await request(app.getHttpServer())
+      .post('/api/admin/login')
+      .set('x-forwarded-for', sourceIp)
+      .send({ email: 'admin@jobtap.test', password: 'wrong-password' })
+      .expect(429);
+  });
+
   it('rejects employer submissions that fill the hidden website field', async () => {
     await request(app.getHttpServer())
       .post('/api/employer/jobs')

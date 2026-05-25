@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Request } from 'express';
+import { resolveRequestSource } from '../common/request-source';
 import { AuthService } from './auth.service';
 import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { LoginDto } from './dto/login.dto';
@@ -11,8 +13,8 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  login(@Body() dto: LoginDto, @Req() req: Request) {
+    return this.authService.login(dto, resolveRequestSource(req));
   }
 
   @UseGuards(JwtAuthGuard)
