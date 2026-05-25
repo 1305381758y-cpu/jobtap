@@ -50,6 +50,11 @@ export class JobFieldsDto {
   @MinLength(3)
   @MaxLength(1000)
   contactUrl: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(0, { message: 'Hidden website field must stay empty' })
+  website?: string;
 }
 
 export class CreateAdminJobDto extends JobFieldsDto {

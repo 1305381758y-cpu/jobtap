@@ -102,6 +102,54 @@ describe('JobTap Module C', () => {
     });
   });
 
+  it('rejects employer submissions that fill the hidden website field', async () => {
+    await request(app.getHttpServer())
+      .post('/api/employer/jobs')
+      .send({
+        title: 'Hidden field check',
+        employerName: 'Bot Filter Inc',
+        countryCode: 'US',
+        isRemote: true,
+        salaryText: '$20/hour',
+        workTimeText: 'Flexible',
+        description: 'This submission should be rejected by the honeypot field.',
+        contactUrl: 'https://example.com/contact',
+        website: 'https://spam.example',
+      })
+      .expect(400)
+      .expect(({ body }) => {
+        expect(body.message).toContain('Hidden website field must stay empty');
+      });
+  });
+
+  it('rate-limits noisy employer submissions from the same source', async () => {
+    const sourceIp = '203.0.113.77';
+    const payload = {
+      title: 'Rate limited helper',
+      employerName: 'Queue Guard',
+      countryCode: 'US',
+      isRemote: false,
+      salaryText: '$18/hour',
+      workTimeText: 'Weekends',
+      description: 'Repeated test submission for rate limiting behavior.',
+      contactUrl: 'https://example.com/rate-limit',
+    };
+
+    for (let index = 0; index < 20; index += 1) {
+      await request(app.getHttpServer())
+        .post('/api/employer/jobs')
+        .set('x-forwarded-for', sourceIp)
+        .send({ ...payload, title: `Rate limited helper ${index}` })
+        .expect(201);
+    }
+
+    await request(app.getHttpServer())
+      .post('/api/employer/jobs')
+      .set('x-forwarded-for', sourceIp)
+      .send({ ...payload, title: 'Rate limited helper overflow' })
+      .expect(429);
+  });
+
   it('deduplicates analytics statistics by country, job, and device', async () => {
     const job = await request(app.getHttpServer())
       .post('/api/admin/jobs')
@@ -163,6 +211,62 @@ describe('JobTap Module C', () => {
       contactClicks: 1,
       contactClickRate: 1,
     });
+  });
+
+  it('accepts Android MVP analytics events with schema version 1', async () => {
+    const job = await request(app.getHttpServer())
+      .post('/api/admin/jobs')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: 'Analytics contract check',
+        employerName: 'SignalWorks',
+        countryCode: 'US',
+        isRemote: true,
+        salaryText: '$24/hour',
+        workTimeText: 'Flexible',
+        description: 'Temporary job used to verify mobile analytics payloads.',
+        contactUrl: 'https://example.com/analytics-contract',
+        status: 'approved',
+      })
+      .expect(201);
+
+    const baseEvent = {
+      countryCode: 'US',
+      platform: 'android',
+      appVersion: '1.0.0',
+      locale: 'en-US',
+      eventSchemaVersion: 1,
+    };
+
+    await request(app.getHttpServer())
+      .post('/api/mobile/analytics/events')
+      .send({ ...baseEvent, eventType: 'app_open', deviceId: 'android-app-open' })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/api/mobile/analytics/events')
+      .send({ ...baseEvent, eventType: 'job_list_view', deviceId: 'android-job-list' })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/api/mobile/analytics/events')
+      .send({
+        ...baseEvent,
+        eventType: 'job_detail_view',
+        deviceId: 'android-job-detail',
+        jobId: job.body.id,
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/api/mobile/analytics/events')
+      .send({
+        ...baseEvent,
+        eventType: 'contact_click',
+        deviceId: 'android-contact-click',
+        jobId: job.body.id,
+      })
+      .expect(201);
   });
 
   it('supports admin account creation, listing, and disabling login', async () => {
@@ -357,6 +461,23 @@ describe('JobTap Module C', () => {
       status: 'rejected',
       source: 'employer_submitted',
     });
+  });
+
+  it('rejects invalid mobile jobs query parameters with 400', async () => {
+    await request(app.getHttpServer())
+      .get('/api/mobile/jobs')
+      .query({ page: 1 })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .get('/api/mobile/jobs')
+      .query({ countryCode: 'US', page: 'zero' })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .get('/api/mobile/jobs')
+      .query({ countryCode: 'USA', page: 1 })
+      .expect(400);
   });
 
   it('removes approved jobs from mobile visibility', async () => {

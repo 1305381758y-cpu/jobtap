@@ -55,7 +55,9 @@ export type JobPayload = {
   status?: JobStatus;
 };
 
-export type EmployerJobPayload = Omit<JobPayload, 'status'>;
+export type EmployerJobPayload = Omit<JobPayload, 'status'> & {
+  website?: string;
+};
 
 export type AdminPayload = {
   email: string;

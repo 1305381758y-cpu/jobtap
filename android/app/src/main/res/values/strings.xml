@@ -24,7 +24,7 @@
     <string name="privacy_para_1">This Privacy Policy explains how JobTap collects, uses, and protects your information.</string>
     <string name="privacy_para_2">We collect an anonymous device identifier to distinguish unique installations of the app. This identifier is generated locally on your device and is not linked to any personal identity.</string>
     <string name="privacy_para_3">We detect your country code based on your device region and system settings. This device-region country is used first to deliver relevant job listings. If your device region is unavailable or invalid, we may use request metadata or IP address as a secondary fallback. This information is used to show you job listings relevant to your region.</string>
-    <string name="privacy_para_4">We collect basic app analytics including page views, job detail views, and contact link clicks. This data helps us improve the application and understand usage patterns.</string>
+    <string name="privacy_para_4">We collect basic app analytics including the following event types: app open (app_open), job list view (job_list_view), job detail view (job_detail_view), and contact link click (contact_click). This data helps us improve the application and understand usage patterns.</string>
     <string name="privacy_para_5">In the current MVP (Minimum Viable Product), there is no account system. You do not need to create an account, provide an email address, or set a password to use JobTap.</string>
     <string name="privacy_para_6">We do not collect your name, email address, phone number, or any other personally identifiable information. We do not share your data with third parties for marketing purposes.</string>
 

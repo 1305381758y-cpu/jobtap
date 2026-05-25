@@ -1,19 +1,14 @@
 import { FormEvent, ReactNode, useEffect, useState } from 'react';
 import {
-  ArrowLeft,
   AlertCircle,
   BarChart3,
-  BadgeCheck,
   BriefcaseBusiness,
-  Clock3,
   CheckCircle2,
-  Globe2,
   LogOut,
   Plus,
   Settings,
   ShieldCheck,
   Send,
-  Sparkles,
 } from 'lucide-react';
 import {
   AdminPayload,
@@ -42,6 +37,7 @@ import {
 import { t, DEFAULT_ADMIN_LOCALE } from './i18n';
 import { validateContactLink } from './contactLinkPolicy';
 import type { SupportedLocale } from './i18n';
+import { COUNTRY_OPTIONS, type CountryOption } from './countryOptions';
 
 type Page = 'review' | 'jobs' | 'statistics' | 'settings';
 type View = 'admin' | 'submit';
@@ -72,6 +68,7 @@ const initialEmployerJobForm: EmployerJobForm = {
   workTimeText: '',
   description: '',
   contactUrl: '',
+  website: '',
 };
 
 const initialAdminForm: AdminPayload = {
@@ -150,6 +147,49 @@ function validateEmployerJobForm(form: EmployerJobPayload): EmployerJobFormError
   }
   return errors;
 }
+
+function formatCountryCodeOption(code: string, options: CountryOption[] = []) {
+  const option = options.find((entry) => entry.code === code);
+  return option ? `${option.code} - ${option.name}` : code;
+}
+
+function filterCountryCodeOptions(query: string, options: CountryOption[] = []) {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return [];
+  const displayCode = normalized.match(/^([a-z]{2})\s+-\s+/)?.[1];
+  const search = displayCode ?? normalized;
+
+  return options.filter((option) => {
+    return (
+      option.code.toLowerCase().includes(search) ||
+      option.name.toLowerCase().includes(search) ||
+      option.englishName.toLowerCase().includes(search)
+    );
+  });
+}
+
+function resolveCountryCodeQuery(query: string, options: CountryOption[] = []) {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return '';
+
+  const displayMatch = query.trim().match(/^([a-z]{2})\s+-\s+/i);
+  if (displayMatch) {
+    return displayMatch[1].toUpperCase();
+  }
+
+  const exactMatch = options.find((option) => {
+    return (
+      option.code.toLowerCase() === normalized ||
+      option.name.toLowerCase() === normalized ||
+      option.englishName.toLowerCase() === normalized
+    );
+  });
+  if (exactMatch) return exactMatch.code;
+
+  const matches = filterCountryCodeOptions(query, options);
+  return matches.length === 1 ? matches[0].code : '';
+}
+
 
 function formatDate(value?: string | null) {
   if (!value) return '-';
@@ -254,15 +294,33 @@ function EmployerSubmissionPage() {
   const [submitError, setSubmitError] = useState('');
   const [submittedJob, setSubmittedJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(false);
+  const countryOptions = COUNTRY_OPTIONS;
+  const [countryQuery, setCountryQuery] = useState(() => formatCountryCodeOption(initialEmployerJobForm.countryCode, COUNTRY_OPTIONS));
+  const [countryOpen, setCountryOpen] = useState(false);
 
   function updateField<K extends keyof EmployerJobForm>(key: K, value: EmployerJobForm[K]) {
     setForm((current) => ({ ...current, [key]: value }));
     setErrors((current) => ({ ...current, [key]: undefined }));
   }
 
+  function selectCountry(code: string) {
+    updateField('countryCode', code);
+    setCountryQuery(formatCountryCodeOption(code, countryOptions));
+    setCountryOpen(false);
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const normalized = normalizeEmployerJobForm(form);
+    const resolvedCountryCode = resolveCountryCodeQuery(countryQuery, countryOptions) || form.countryCode;
+    if (!resolvedCountryCode && countryQuery.trim()) {
+      setErrors((current) => ({ ...current, countryCode: '请从下拉中选择一个国家' }));
+      return;
+    }
+
+    const normalized = normalizeEmployerJobForm({
+      ...form,
+      countryCode: resolvedCountryCode,
+    });
     const nextErrors = validateEmployerJobForm(normalized);
     setErrors(nextErrors);
     setSubmitError('');
@@ -273,6 +331,7 @@ function EmployerSubmissionPage() {
       const job = await submitEmployerJob(normalized);
       setSubmittedJob(job);
       setForm(initialEmployerJobForm);
+      setCountryQuery(formatCountryCodeOption(initialEmployerJobForm.countryCode, countryOptions));
       setErrors({});
     } catch (err) {
       setSubmitError(err instanceof ApiError ? err.message : '提交失败，请稍后再试');
@@ -284,36 +343,10 @@ function EmployerSubmissionPage() {
   return (
     <main className="public-page">
       <div className="public-shell">
-        <section className="public-hero">
-          <a className="text-link hero-back" href="/">
-            <ArrowLeft size={16} />
-            返回后台
-          </a>
-          <div className="hero-badge">
-            <Sparkles size={14} />
-            招聘方公开提交页
-          </div>
-          <h1>把职位直接交给我们审核</h1>
-          <p className="hero-copy">
-            填完后会直接进入审核队列。我们会检查职位信息、联系链接和发布内容，审核通过后再进入站内展示。
-          </p>
-          <div className="hero-points">
-            <div>
-              <BadgeCheck size={18} />
-              <span>公开可访问，适合快速投递</span>
-            </div>
-            <div>
-              <Clock3 size={18} />
-              <span>提交后进入待审核状态</span>
-            </div>
-            <div>
-              <Globe2 size={18} />
-              <span>支持远程和本地职位</span>
-            </div>
-          </div>
-        </section>
-
         <section className="public-card">
+          <a className="text-link hero-back" href="/?mode=submit">
+            JobTap 点职
+          </a>
           {submittedJob ? (
             <div className="success-card">
               <div className="success-icon">
@@ -369,16 +402,51 @@ function EmployerSubmissionPage() {
             </div>
 
             <div className="form-grid">
-              <label>
+              <label className="country-combobox">
                 <span>国家代码 *</span>
                 <input
                   required
-                  maxLength={2}
-                  value={form.countryCode}
-                  onChange={(event) => updateField('countryCode', event.target.value.toUpperCase())}
+                  value={countryQuery}
+                  onFocus={() => setCountryOpen(true)}
+                  onChange={(event) => {
+                    setCountryQuery(event.target.value);
+                    setCountryOpen(true);
+                    const resolved = resolveCountryCodeQuery(event.target.value, countryOptions);
+                    if (resolved) {
+                      updateField('countryCode', resolved);
+                    }
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => setCountryOpen(false), 120);
+                    const resolved = resolveCountryCodeQuery(countryQuery, countryOptions);
+                    if (resolved) {
+                      selectCountry(resolved);
+                    }
+                  }}
                   aria-invalid={Boolean(errors.countryCode)}
-                  placeholder="US"
+                  placeholder="搜索国家代码或国家名"
+                  autoComplete="off"
                 />
+                <div className={`country-dropdown ${countryOpen ? 'open' : ''}`}>
+                  {countryOpen ? (
+                    filterCountryCodeOptions(countryQuery, countryOptions).length > 0 ? (
+                      filterCountryCodeOptions(countryQuery, countryOptions).map((option) => (
+                        <button
+                          key={option.code}
+                          type="button"
+                          className="country-option"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => selectCountry(option.code)}
+                        >
+                          <strong>{option.code}</strong>
+                          <span>{option.name}</span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="country-empty">没有匹配的国家代码</div>
+                    )
+                  ) : null}
+                </div>
                 {errors.countryCode ? <small>{errors.countryCode}</small> : null}
               </label>
               <label>
@@ -454,6 +522,16 @@ function EmployerSubmissionPage() {
                 placeholder="介绍岗位职责、要求、团队背景、福利等"
               />
               {errors.description ? <small>{errors.description}</small> : null}
+            </label>
+
+            <label className="honeypot-field" aria-hidden="true">
+              Website
+              <input
+                tabIndex={-1}
+                autoComplete="off"
+                value={form.website ?? ''}
+                onChange={(event) => updateField('website', event.target.value)}
+              />
             </label>
 
             <div className="public-form-footer">
@@ -786,9 +864,9 @@ function StatisticsPage({ token }: { token: string }) {
         <button onClick={() => setFilters({ range: 'all', countryCode: '', jobId: '', startDate: '', endDate: '' })}>重置</button>
       </div>
       <div className="metric-grid">
-        <MetricCard label="活跃用户" value={totals.activeUsers.toLocaleString()} />
-        <MetricCard label="详情浏览" value={totals.detailViews.toLocaleString()} />
-        <MetricCard label="联系点击" value={totals.contactClicks.toLocaleString()} />
+        <MetricCard label="活跃人数" value={totals.activeUsers.toLocaleString()} />
+        <MetricCard label="浏览详情人数" value={totals.detailViews.toLocaleString()} />
+        <MetricCard label="点击联系人数" value={totals.contactClicks.toLocaleString()} />
         <MetricCard label="平均联系点击率" value={`${(averageRate * 100).toFixed(1)}%`} />
       </div>
       <div className="panel">
@@ -796,11 +874,11 @@ function StatisticsPage({ token }: { token: string }) {
         <table>
           <thead>
             <tr>
-              <th>国家代码</th>
-              <th>职位 ID</th>
-              <th>活跃用户</th>
-              <th>详情浏览</th>
-              <th>联系点击</th>
+              <th>国家</th>
+              <th>岗位 ID</th>
+              <th>活跃人数</th>
+              <th>浏览详情人数</th>
+              <th>点击联系人数</th>
               <th>联系点击率</th>
             </tr>
           </thead>

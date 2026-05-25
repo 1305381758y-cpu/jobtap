@@ -8,5 +8,6 @@ data class AnalyticsEventDto(
     val platform: String = "android",
     val appVersion: String? = null,
     val locale: String? = null,
-    val sourceScreen: String? = null
+    val sourceScreen: String? = null,
+    val eventSchemaVersion: Int = 1
 )

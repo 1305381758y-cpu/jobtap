@@ -83,6 +83,7 @@ class MobileApiClient(
         json.put("countryCode", countryCode)
         jobId?.let { json.put("jobId", it) }
         json.put("platform", platform)
+        json.put("eventSchemaVersion", eventSchemaVersion)
         appVersion?.let { json.put("appVersion", it) }
         locale?.let { json.put("locale", it) }
         sourceScreen?.let { json.put("sourceScreen", it) }

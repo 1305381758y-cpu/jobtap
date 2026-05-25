@@ -70,6 +70,8 @@ npm run admin:build
 
 Admin endpoints require `Authorization: Bearer <accessToken>` from `POST /api/admin/login`.
 
+Production startup validates required secrets and database settings when `NODE_ENV=production`.
+
 ### Analytics Events
 
 `POST /api/mobile/analytics/events` requires `eventSchemaVersion: 1`. The endpoint rejects suspicious device IDs and applies a basic per-device in-memory rate limit controlled by `ANALYTICS_RATE_LIMIT_PER_MINUTE`.

@@ -1,7 +1,10 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Get,
+  HttpException,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -10,6 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { resolveRequestSource } from '../common/request-source';
 import { JobSource, JobStatus } from '../database/entities/job.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OwnerGuard } from '../auth/owner.guard';
@@ -20,14 +24,37 @@ import { JobsService } from './jobs.service';
 
 type AuthenticatedRequest = Request & { admin: { sub: string; email: string; role: string } };
 
+const EMPLOYER_SUBMISSION_LIMIT = 20;
+const EMPLOYER_SUBMISSION_WINDOW_MS = 10 * 60 * 1000;
+
 @Controller('api/employer/jobs')
 export class EmployerJobsController {
+  private readonly submissionAttempts = new Map<string, number[]>();
+
   constructor(private readonly jobsService: JobsService) {}
 
   @Post()
-  submit(@Body() dto: JobFieldsDto) {
+  submit(@Body() dto: JobFieldsDto, @Req() req: Request) {
+    this.assertWithinRateLimit(req);
     return this.jobsService.submitEmployerJob(dto);
   }
+
+  private assertWithinRateLimit(req: Request): void {
+    const source = resolveRequestSource(req);
+    const now = Date.now();
+    const recent = (this.submissionAttempts.get(source) ?? []).filter(
+      (timestamp) => now - timestamp < EMPLOYER_SUBMISSION_WINDOW_MS,
+    );
+
+    if (recent.length >= EMPLOYER_SUBMISSION_LIMIT) {
+      this.submissionAttempts.set(source, recent);
+      throw new HttpException('Too many employer submissions from this source', HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    recent.push(now);
+    this.submissionAttempts.set(source, recent);
+  }
+
 }
 
 @Controller('api/mobile')
@@ -92,7 +119,16 @@ export class MobileJobsController {
 
   @Get('jobs')
   list(@Query('countryCode') countryCode: string, @Query('page') page?: string) {
-    return this.jobsService.listMobileJobs(countryCode.toUpperCase(), Number(page ?? 1));
+    const normalizedCountryCode = countryCode?.trim().toUpperCase();
+    const parsedPage = page === undefined ? 1 : Number(page);
+    if (!normalizedCountryCode || !/^[A-Z]{2}$/.test(normalizedCountryCode)) {
+      throw new BadRequestException('countryCode must be a 2-letter country code');
+    }
+    if (!Number.isInteger(parsedPage) || parsedPage < 1) {
+      throw new BadRequestException('page must be a positive integer');
+    }
+
+    return this.jobsService.listMobileJobs(normalizedCountryCode, parsedPage);
   }
 
   @Get('jobs/:id')

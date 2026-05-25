@@ -7,7 +7,7 @@ export class InitialModuleCSchema20260430000000 implements MigrationInterface {
     await queryRunner.query('CREATE EXTENSION IF NOT EXISTS "pgcrypto"');
 
     await queryRunner.query(`
-      CREATE TABLE "admin_users" (
+      CREATE TABLE IF NOT EXISTS "admin_users" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "email" varchar NOT NULL UNIQUE,
         "passwordHash" varchar NOT NULL,
@@ -18,7 +18,7 @@ export class InitialModuleCSchema20260430000000 implements MigrationInterface {
     `);
 
     await queryRunner.query(`
-      CREATE TABLE "jobs" (
+      CREATE TABLE IF NOT EXISTS "jobs" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "title" varchar NOT NULL,
         "employerName" varchar NOT NULL,
@@ -42,10 +42,9 @@ export class InitialModuleCSchema20260430000000 implements MigrationInterface {
     `);
 
     await queryRunner.query(`
-      CREATE TABLE "analytics_events" (
+      CREATE TABLE IF NOT EXISTS "analytics_events" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "eventType" varchar NOT NULL,
-        "eventSchemaVersion" integer NOT NULL DEFAULT 1,
         "deviceId" varchar NOT NULL,
         "countryCode" varchar(2) NOT NULL,
         "jobId" varchar,
@@ -58,22 +57,22 @@ export class InitialModuleCSchema20260430000000 implements MigrationInterface {
     `);
 
     await queryRunner.query(
-      'CREATE INDEX "idx_jobs_country_status_published" ON "jobs" ("countryCode", "status", "publishedAt")',
+      'CREATE INDEX IF NOT EXISTS "idx_jobs_country_status_published" ON "jobs" ("countryCode", "status", "publishedAt")',
     );
     await queryRunner.query(
-      'CREATE INDEX "idx_jobs_status_source_created" ON "jobs" ("status", "source", "createdAt")',
+      'CREATE INDEX IF NOT EXISTS "idx_jobs_status_source_created" ON "jobs" ("status", "source", "createdAt")',
     );
     await queryRunner.query(
-      'CREATE INDEX "idx_analytics_type_country_created" ON "analytics_events" ("eventType", "countryCode", "createdAt")',
+      'CREATE INDEX IF NOT EXISTS "idx_analytics_type_country_created" ON "analytics_events" ("eventType", "countryCode", "createdAt")',
     );
     await queryRunner.query(
-      'CREATE INDEX "idx_analytics_type_country_job_created" ON "analytics_events" ("eventType", "countryCode", "jobId", "createdAt")',
+      'CREATE INDEX IF NOT EXISTS "idx_analytics_type_country_job_created" ON "analytics_events" ("eventType", "countryCode", "jobId", "createdAt")',
     );
     await queryRunner.query(
-      'CREATE INDEX "idx_analytics_country_device_created" ON "analytics_events" ("countryCode", "deviceId", "createdAt")',
+      'CREATE INDEX IF NOT EXISTS "idx_analytics_country_device_created" ON "analytics_events" ("countryCode", "deviceId", "createdAt")',
     );
     await queryRunner.query(
-      'CREATE INDEX "idx_analytics_country_job_device_type" ON "analytics_events" ("countryCode", "jobId", "deviceId", "eventType")',
+      'CREATE INDEX IF NOT EXISTS "idx_analytics_country_job_device_type" ON "analytics_events" ("countryCode", "jobId", "deviceId", "eventType")',
     );
   }
 

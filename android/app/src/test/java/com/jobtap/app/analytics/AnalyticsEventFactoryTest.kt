@@ -225,5 +225,9 @@ class AnalyticsEventFactoryTest {
         assertEquals("shared-device", listView.deviceId)
         assertEquals("shared-device", detailView.deviceId)
         assertEquals("shared-device", contact.deviceId)
+        assertEquals(1, appOpen.eventSchemaVersion)
+        assertEquals(1, listView.eventSchemaVersion)
+        assertEquals(1, detailView.eventSchemaVersion)
+        assertEquals(1, contact.eventSchemaVersion)
     }
 }

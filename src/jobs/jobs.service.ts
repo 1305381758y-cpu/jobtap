@@ -54,6 +54,9 @@ export class JobsService {
   constructor(@InjectRepository(Job) private readonly jobs: Repository<Job>) {}
 
   async submitEmployerJob(dto: JobFieldsDto): Promise<Job> {
+    if (dto.website?.trim()) {
+      throw new BadRequestException('Hidden website field must stay empty');
+    }
     this.assertAllowedContactUrl(dto.contactUrl);
     return this.jobs.save(
       this.jobs.create({
@@ -180,16 +183,19 @@ export class JobsService {
   }
 
   private normalizeJobFields<T extends Partial<JobFieldsDto>>(dto: T): Partial<Job> {
+    const fields = { ...dto };
+    delete fields.website;
+
     return {
-      ...dto,
-      countryCode: dto.countryCode?.toUpperCase(),
-      city: dto.city?.trim() || null,
-      title: dto.title?.trim(),
-      employerName: dto.employerName?.trim(),
-      salaryText: dto.salaryText?.trim(),
-      workTimeText: dto.workTimeText?.trim(),
-      description: dto.description?.trim(),
-      contactUrl: dto.contactUrl?.trim(),
+      ...fields,
+      countryCode: fields.countryCode?.toUpperCase(),
+      city: fields.city?.trim() || null,
+      title: fields.title?.trim(),
+      employerName: fields.employerName?.trim(),
+      salaryText: fields.salaryText?.trim(),
+      workTimeText: fields.workTimeText?.trim(),
+      description: fields.description?.trim(),
+      contactUrl: fields.contactUrl?.trim(),
     };
   }
 

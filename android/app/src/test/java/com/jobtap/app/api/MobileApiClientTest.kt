@@ -164,10 +164,11 @@ class MobileApiClientTest {
         assertEquals("US", json.getString("countryCode"))
         assertEquals("job-42", json.getString("jobId"))
         assertEquals("android", json.getString("platform"))
+        assertEquals(1, json.getInt("eventSchemaVersion"))
         assertEquals("1.0.0", json.getString("appVersion"))
         assertEquals("en-US", json.getString("locale"))
         assertEquals("job_detail", json.getString("sourceScreen"))
-        assertEquals("Should have exactly 8 keys", 8, json.length())
+        assertEquals("Should have exactly 9 keys", 9, json.length())
     }
 
     @Test
@@ -175,7 +176,6 @@ class MobileApiClientTest {
         val transport = FakeTransport()
         val client = MobileApiClient("https://example.com", transport)
 
-        // Only required fields, no optionals
         val event = AnalyticsEventDto(
             eventType = AnalyticsEventType.APP_OPEN,
             deviceId = "device-456",
@@ -190,12 +190,12 @@ class MobileApiClientTest {
         assertEquals("GB", json.getString("countryCode"))
         assertEquals("android", json.getString("platform"))
 
-        // Optional fields should NOT be present
         assertEquals(false, json.has("jobId"))
         assertEquals(false, json.has("appVersion"))
         assertEquals(false, json.has("locale"))
         assertEquals(false, json.has("sourceScreen"))
-        assertEquals("Should have exactly 4 keys", 4, json.length())
+        assertEquals(1, json.getInt("eventSchemaVersion"))
+        assertEquals("Should have exactly 5 keys", 5, json.length())
     }
 
     @Test

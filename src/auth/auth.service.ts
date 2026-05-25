@@ -25,7 +25,7 @@ export class AuthService implements OnModuleInit {
     const count = await this.admins.count();
     if (count > 0) return;
 
-    const email = process.env.ADMIN_EMAIL ?? 'admin@jobtap.local';
+    const email = (process.env.ADMIN_EMAIL ?? 'admin@jobtap.local').toLowerCase();
     const password = process.env.ADMIN_PASSWORD ?? 'change-me-now';
     const passwordHash = await bcrypt.hash(password, 10);
 
@@ -39,7 +39,8 @@ export class AuthService implements OnModuleInit {
   }
 
   async login(dto: LoginDto): Promise<{ accessToken: string }> {
-    const admin = await this.admins.findOne({ where: { email: dto.email } });
+    const email = dto.email.toLowerCase();
+    const admin = await this.admins.findOne({ where: { email } });
     if (!admin) throw new UnauthorizedException('Invalid credentials');
     if (admin.status !== AdminStatus.Active) {
       throw new UnauthorizedException('Admin account disabled');

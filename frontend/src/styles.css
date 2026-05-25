@@ -563,12 +563,8 @@ td strong {
   min-height: calc(100vh - 48px);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(0, 1.05fr);
-  gap: 20px;
-  align-items: stretch;
 }
 
-.public-hero,
 .public-card {
   border: 1px solid rgba(203, 213, 223, 0.8);
   border-radius: 24px;
@@ -577,58 +573,8 @@ td strong {
   box-shadow: 0 18px 45px rgba(21, 25, 29, 0.08);
 }
 
-.public-hero {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 42px;
-}
-
 .hero-back {
-  align-self: flex-start;
-  margin-bottom: 24px;
-}
-
-.hero-badge {
-  width: fit-content;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border-radius: 999px;
-  background: #e7f5f3;
-  color: var(--primary-strong);
-  padding: 8px 12px;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.public-hero h1 {
-  margin: 18px 0 14px;
-  font-size: clamp(34px, 4vw, 58px);
-  line-height: 1.02;
-  letter-spacing: -0.05em;
-}
-
-.hero-copy {
-  max-width: 32rem;
-  margin: 0;
-  color: var(--muted);
-  font-size: 16px;
-  line-height: 1.7;
-}
-
-.hero-points {
-  display: grid;
-  gap: 12px;
-  margin-top: 28px;
-}
-
-.hero-points div {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--text);
-  font-weight: 600;
+  margin-bottom: 20px;
 }
 
 .public-card {
@@ -684,6 +630,71 @@ td strong {
 
 .public-form .form-grid {
   margin-top: 0;
+}
+
+.country-combobox {
+  position: relative;
+}
+
+.country-dropdown {
+  display: none;
+  max-height: 224px;
+  overflow-y: auto;
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 16px 40px rgba(21, 25, 29, 0.12);
+}
+
+.country-dropdown.open {
+  display: grid;
+  gap: 6px;
+}
+
+.country-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: #f8fbfc;
+  color: var(--text);
+  text-align: left;
+}
+
+.country-option strong {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.country-option span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.country-option:hover {
+  border-color: #cfe8e4;
+  background: #edf7f5;
+}
+
+.country-empty {
+  padding: 12px 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.honeypot-field {
+  position: absolute !important;
+  left: -10000px !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
 }
 
 .checkbox-field {
@@ -793,14 +804,6 @@ td strong {
   .metric-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-
-  .public-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .public-hero {
-    padding: 28px;
-  }
 }
 
 @media (max-width: 760px) {
@@ -853,13 +856,8 @@ td strong {
     min-height: auto;
   }
 
-  .public-hero,
   .public-card {
     border-radius: 20px;
-  }
-
-  .public-hero {
-    padding: 22px;
   }
 
   .public-card {

@@ -102,6 +102,21 @@ class ContactLinkValidatorTest {
     }
 
     @Test
+    fun `whatsapp deep link is valid`() {
+        assertTrue(ContactLinkValidator.isValid("whatsapp://send?phone=+15551234567"))
+    }
+
+    @Test
+    fun `telegram deep link is valid`() {
+        assertTrue(ContactLinkValidator.isValid("tg://resolve?domain=jobtap"))
+    }
+
+    @Test
+    fun `telegram https link is valid`() {
+        assertTrue(ContactLinkValidator.isValid("https://t.me/jobtap"))
+    }
+
+    @Test
     fun `data URL is invalid`() {
         assertFalse(ContactLinkValidator.isValid("data:text/html,Hello"))
     }

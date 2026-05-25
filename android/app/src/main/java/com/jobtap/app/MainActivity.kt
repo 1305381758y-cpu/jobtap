@@ -59,7 +59,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -72,6 +71,7 @@ import com.jobtap.app.analytics.SharedPreferencesDeviceIdStore
 import com.jobtap.app.api.HttpUrlConnectionApiTransport
 import com.jobtap.app.api.MobileApiClient
 import com.jobtap.app.contact.ContactLinkValidator
+import com.jobtap.app.contact.ExternalLinkOpener
 import com.jobtap.app.country.CountryDetector
 import com.jobtap.app.data.MobileJobsRepository
 import com.jobtap.app.model.Job
@@ -89,7 +89,7 @@ private val Muted = Color(0xFF6B7280)
 private val SoftGray = Color(0xFFF3F4F6)
 private val BorderGray = Color(0xFFE5E7EB)
 private val DangerRed = Color(0xFFDC2626)
-private const val ApiBaseUrl = "http://10.0.2.2:3000"
+private val ApiBaseUrl = BuildConfig.API_BASE_URL
 private const val JobsPageSize = 20
 
 class MainActivity : ComponentActivity() {
@@ -700,7 +700,7 @@ private fun JobDetailScreen(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
     val detailUnableToOpen = stringResource(R.string.detail_unable_to_open)
 
     Scaffold(
@@ -730,9 +730,8 @@ private fun JobDetailScreen(
                                 )
                             }
                         } else {
-                            try {
-                                uriHandler.openUri(trimmedUrl)
-                            } catch (_: Exception) {
+                            val error = ExternalLinkOpener.open(context, trimmedUrl)
+                            if (error != null) {
                                 scope.launch {
                                     snackbarHostState.showSnackbar(
                                         message = detailUnableToOpen,
