@@ -12,6 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcryptjs';
 import { Repository } from 'typeorm';
+import { WindowedAttemptStore } from '../common/windowed-attempt-store';
 import { AdminRole, AdminStatus, AdminUser } from '../database/entities/admin-user.entity';
 import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { LoginDto } from './dto/login.dto';
@@ -22,7 +23,7 @@ const LOGIN_FAILURE_WINDOW_MS = 10 * 60 * 1000;
 
 @Injectable()
 export class AuthService implements OnModuleInit {
-  private readonly failedLogins = new Map<string, number[]>();
+  private readonly failedLogins = new WindowedAttemptStore(LOGIN_FAILURE_WINDOW_MS);
   private readonly logger = new Logger(AuthService.name);
 
   constructor(
@@ -70,7 +71,7 @@ export class AuthService implements OnModuleInit {
 
     admin.lastLoginAt = new Date();
     await this.admins.save(admin);
-    this.failedLogins.delete(attemptKey);
+    this.failedLogins.reset(attemptKey);
 
     return {
       accessToken: await this.jwtService.signAsync({
@@ -82,21 +83,12 @@ export class AuthService implements OnModuleInit {
   }
 
   private assertLoginAllowed(attemptKey: string): void {
-    const now = Date.now();
-    const recent = (this.failedLogins.get(attemptKey) ?? []).filter(
-      (timestamp) => now - timestamp < LOGIN_FAILURE_WINDOW_MS,
-    );
-    this.failedLogins.set(attemptKey, recent);
-
-    if (recent.length >= LOGIN_FAILURE_LIMIT) {
+    if (!this.failedLogins.attempt(attemptKey, LOGIN_FAILURE_LIMIT)) {
       throw new HttpException('Too many failed login attempts', HttpStatus.TOO_MANY_REQUESTS);
     }
   }
 
   private recordLoginFailure(attemptKey: string, email: string, source: string): void {
-    const recent = this.failedLogins.get(attemptKey) ?? [];
-    recent.push(Date.now());
-    this.failedLogins.set(attemptKey, recent);
     this.logger.warn({ message: 'Admin login failed', email, source });
   }
 

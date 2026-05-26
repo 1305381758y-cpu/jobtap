@@ -5,6 +5,7 @@ import {
   AnalyticsEvent,
   AnalyticsEventType,
 } from '../database/entities/analytics-event.entity';
+import { WindowedAttemptStore } from '../common/windowed-attempt-store';
 import { CreateAnalyticsEventDto } from './dto/create-analytics-event.dto';
 
 type StatisticsQuery = {
@@ -25,7 +26,7 @@ type StatisticsRow = {
 
 @Injectable()
 export class AnalyticsService {
-  private readonly deviceWindows = new Map<string, number[]>();
+  private readonly deviceWindows = new WindowedAttemptStore(60_000);
 
   constructor(
     @InjectRepository(AnalyticsEvent)
@@ -111,9 +112,14 @@ export class AnalyticsService {
     }
 
     if (query.startDate && query.endDate) {
+      const startDate = this.parseDate(query.startDate, 'startDate');
+      const endDate = this.parseDate(query.endDate, 'endDate');
+      if (endDate < startDate) {
+        throw new BadRequestException('endDate must be greater than or equal to startDate');
+      }
       qb.andWhere('event.createdAt BETWEEN :startDate AND :endDate', {
-        startDate: new Date(query.startDate),
-        endDate: new Date(query.endDate),
+        startDate,
+        endDate,
       });
       return;
     }
@@ -139,6 +145,14 @@ export class AnalyticsService {
     return undefined;
   }
 
+  private parseDate(value: string, field: string): Date {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException(`${field} must be a valid date`);
+    }
+    return date;
+  }
+
   private assertAllowedDevice(deviceId: string): void {
     if (/^(.)\1{7,}$/.test(deviceId)) {
       throw new BadRequestException('suspicious deviceId');
@@ -147,18 +161,8 @@ export class AnalyticsService {
 
   private assertWithinRateLimit(deviceId: string): void {
     const maxEvents = Number(process.env.ANALYTICS_RATE_LIMIT_PER_MINUTE ?? 60);
-    const now = Date.now();
-    const windowStart = now - 60_000;
-    const recentEvents = (this.deviceWindows.get(deviceId) ?? []).filter(
-      (timestamp) => timestamp > windowStart,
-    );
-
-    if (recentEvents.length >= maxEvents) {
-      this.deviceWindows.set(deviceId, recentEvents);
+    if (!this.deviceWindows.attempt(deviceId, maxEvents)) {
       throw new HttpException('analytics rate limit exceeded', HttpStatus.TOO_MANY_REQUESTS);
     }
-
-    recentEvents.push(now);
-    this.deviceWindows.set(deviceId, recentEvents);
   }
 }

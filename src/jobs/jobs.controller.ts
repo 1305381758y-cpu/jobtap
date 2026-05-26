@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { resolveRequestSource } from '../common/request-source';
+import { WindowedAttemptStore } from '../common/windowed-attempt-store';
 import { JobSource, JobStatus } from '../database/entities/job.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OwnerGuard } from '../auth/owner.guard';
@@ -29,7 +30,7 @@ const EMPLOYER_SUBMISSION_WINDOW_MS = 10 * 60 * 1000;
 
 @Controller('api/employer/jobs')
 export class EmployerJobsController {
-  private readonly submissionAttempts = new Map<string, number[]>();
+  private readonly submissionAttempts = new WindowedAttemptStore(EMPLOYER_SUBMISSION_WINDOW_MS);
 
   constructor(private readonly jobsService: JobsService) {}
 
@@ -41,18 +42,9 @@ export class EmployerJobsController {
 
   private assertWithinRateLimit(req: Request): void {
     const source = resolveRequestSource(req);
-    const now = Date.now();
-    const recent = (this.submissionAttempts.get(source) ?? []).filter(
-      (timestamp) => now - timestamp < EMPLOYER_SUBMISSION_WINDOW_MS,
-    );
-
-    if (recent.length >= EMPLOYER_SUBMISSION_LIMIT) {
-      this.submissionAttempts.set(source, recent);
+    if (!this.submissionAttempts.attempt(source, EMPLOYER_SUBMISSION_LIMIT)) {
       throw new HttpException('Too many employer submissions from this source', HttpStatus.TOO_MANY_REQUESTS);
     }
-
-    recent.push(now);
-    this.submissionAttempts.set(source, recent);
   }
 
 }

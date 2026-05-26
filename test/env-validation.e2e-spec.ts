@@ -20,6 +20,25 @@ describe('production environment validation', () => {
     ).not.toThrow();
   });
 
+  it('rejects invalid optional production environment values', () => {
+    const validProductionEnv = {
+      NODE_ENV: 'production',
+      JWT_SECRET: 'prod-secret-not-default-with-32-chars',
+      ADMIN_EMAIL: 'owner@example.com',
+      ADMIN_PASSWORD: 'strong-password-not-default',
+      DATABASE_URL: 'postgres://user:pass@host:5432/db',
+      TYPEORM_SYNCHRONIZE: 'false',
+    };
+
+    expect(() => requireProductionEnv({ ...validProductionEnv, PORT: 'abc' })).toThrow(/PORT/);
+    expect(() =>
+      requireProductionEnv({ ...validProductionEnv, ANALYTICS_RATE_LIMIT_PER_MINUTE: '0' }),
+    ).toThrow(/ANALYTICS_RATE_LIMIT_PER_MINUTE/);
+    expect(() =>
+      requireProductionEnv({ ...validProductionEnv, ADMIN_FRONTEND_ORIGINS: 'not-a-url' }),
+    ).toThrow(/ADMIN_FRONTEND_ORIGINS/);
+  });
+
   it('rejects production startup with local default database credentials', () => {
     expect(() =>
       requireProductionEnv({

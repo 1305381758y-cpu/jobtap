@@ -7,6 +7,9 @@ coverage/
 *.sqlite
 *.sqlite3
 *.tsbuildinfo
+*.swp
+*.swo
+*~
 .playwright-cli/
 output/playwright/
 .worktrees/

@@ -52,6 +52,18 @@ export function requireProductionEnv(env: NodeJS.ProcessEnv = process.env): void
   if (env.TYPEORM_SYNCHRONIZE?.trim().toLowerCase() === 'true') {
     errors.push('TYPEORM_SYNCHRONIZE must not be true in production');
   }
+  if (env.PORT && !isPositiveInteger(env.PORT)) {
+    errors.push('PORT must be a positive integer');
+  }
+  if (
+    env.ANALYTICS_RATE_LIMIT_PER_MINUTE &&
+    !isPositiveInteger(env.ANALYTICS_RATE_LIMIT_PER_MINUTE)
+  ) {
+    errors.push('ANALYTICS_RATE_LIMIT_PER_MINUTE must be a positive integer');
+  }
+  if (env.ADMIN_FRONTEND_ORIGINS && !hasOnlyHttpOrigins(env.ADMIN_FRONTEND_ORIGINS)) {
+    errors.push('ADMIN_FRONTEND_ORIGINS must be a comma-separated list of http(s) origins');
+  }
 
   if (errors.length > 0) {
     throw new Error(`Production environment validation failed: ${errors.join('; ')}`);
@@ -60,4 +72,24 @@ export function requireProductionEnv(env: NodeJS.ProcessEnv = process.env): void
 
 export function requiredProductionEnvKeys(): string[] {
   return [...REQUIRED_PRODUCTION_ENV];
+}
+
+function isPositiveInteger(value: string): boolean {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0;
+}
+
+function hasOnlyHttpOrigins(value: string): boolean {
+  return value
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+    .every((origin) => {
+      try {
+        const url = new URL(origin);
+        return ['http:', 'https:'].includes(url.protocol) && url.origin === origin;
+      } catch {
+        return false;
+      }
+    });
 }

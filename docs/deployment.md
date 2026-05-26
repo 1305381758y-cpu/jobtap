@@ -65,3 +65,6 @@ On first startup with an empty `admin_users` table, the backend creates the owne
 ```text
 GET /health
 ```
+
+The endpoint returns `200` only when the service is running and the database responds to
+`SELECT 1`; database failures return `503`.

@@ -2,6 +2,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request = require('supertest');
 import { AppModule } from '../src/app.module';
+import { configureCors } from '../src/common/cors';
 
 describe('JobTap Module C', () => {
   let app: INestApplication;
@@ -11,13 +12,15 @@ describe('JobTap Module C', () => {
     process.env.NODE_ENV = 'test';
     process.env.JWT_SECRET = 'test-secret';
     process.env.ADMIN_EMAIL = 'admin@jobtap.test';
-    process.env.ADMIN_PASSWORD = 'password123';
+    process.env.ADMIN_PASSWORD = 'password1234';
+    process.env.ADMIN_FRONTEND_ORIGINS = 'https://admin.jobtap.test';
 
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
     app = moduleRef.createNestApplication();
+    configureCors(app);
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -75,7 +78,7 @@ describe('JobTap Module C', () => {
 
     const login = await request(app.getHttpServer())
       .post('/api/admin/login')
-      .send({ email: 'admin@jobtap.test', password: 'password123' })
+      .send({ email: 'admin@jobtap.test', password: 'password1234' })
       .expect(201);
 
     token = login.body.accessToken;
@@ -107,9 +110,31 @@ describe('JobTap Module C', () => {
       .get('/health')
       .expect(200)
       .expect(({ body }) => {
-        expect(body).toMatchObject({ status: 'ok', service: 'jobtap-module-c' });
+        expect(body).toMatchObject({ status: 'ok', service: 'jobtap-module-c', database: 'ok' });
         expect(body.timestamp).toEqual(expect.any(String));
       });
+  });
+
+  it('keeps admin CORS restricted while public mobile CORS remains available', async () => {
+    await request(app.getHttpServer())
+      .options('/api/admin/jobs')
+      .set('Origin', 'https://evil.example')
+      .expect(403)
+      .expect((res) => {
+        expect(res.headers['access-control-allow-origin']).toBeUndefined();
+      });
+
+    await request(app.getHttpServer())
+      .options('/api/admin/jobs')
+      .set('Origin', 'https://admin.jobtap.test')
+      .expect(204)
+      .expect('Access-Control-Allow-Origin', 'https://admin.jobtap.test');
+
+    await request(app.getHttpServer())
+      .options('/api/mobile/jobs')
+      .set('Origin', 'https://public-client.example')
+      .expect(204)
+      .expect('Access-Control-Allow-Origin', 'https://public-client.example');
   });
 
   it('rate-limits repeated failed admin logins by source and account', async () => {
@@ -241,6 +266,23 @@ describe('JobTap Module C', () => {
     });
   });
 
+  it('rejects invalid analytics statistics date filters', async () => {
+    await request(app.getHttpServer())
+      .get('/api/admin/statistics')
+      .set('Authorization', `Bearer ${token}`)
+      .query({ startDate: 'not-a-date', endDate: '2026-05-26T00:00:00.000Z' })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .get('/api/admin/statistics')
+      .set('Authorization', `Bearer ${token}`)
+      .query({
+        startDate: '2026-05-27T00:00:00.000Z',
+        endDate: '2026-05-26T00:00:00.000Z',
+      })
+      .expect(400);
+  });
+
   it('accepts Android MVP analytics events with schema version 1', async () => {
     const job = await request(app.getHttpServer())
       .post('/api/admin/jobs')
@@ -303,7 +345,7 @@ describe('JobTap Module C', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({
         email: 'ops@jobtap.test',
-        password: 'password123',
+        password: 'password1234',
         role: 'operator',
         status: 'active',
       })
@@ -325,7 +367,7 @@ describe('JobTap Module C', () => {
 
     const opsLogin = await request(app.getHttpServer())
       .post('/api/admin/login')
-      .send({ email: 'ops@jobtap.test', password: 'password123' })
+      .send({ email: 'ops@jobtap.test', password: 'password1234' })
       .expect(201);
 
     await request(app.getHttpServer())
@@ -337,7 +379,7 @@ describe('JobTap Module C', () => {
 
     await request(app.getHttpServer())
       .post('/api/admin/login')
-      .send({ email: 'ops@jobtap.test', password: 'password123' })
+      .send({ email: 'ops@jobtap.test', password: 'password1234' })
       .expect(401);
 
     await request(app.getHttpServer())
@@ -384,7 +426,7 @@ describe('JobTap Module C', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({
         email: 'limited-ops@jobtap.test',
-        password: 'password123',
+        password: 'password1234',
         role: 'operator',
         status: 'active',
       })
@@ -392,7 +434,7 @@ describe('JobTap Module C', () => {
 
     const operatorLogin = await request(app.getHttpServer())
       .post('/api/admin/login')
-      .send({ email: 'limited-ops@jobtap.test', password: 'password123' })
+      .send({ email: 'limited-ops@jobtap.test', password: 'password1234' })
       .expect(201);
 
     await request(app.getHttpServer())
@@ -400,7 +442,7 @@ describe('JobTap Module C', () => {
       .set('Authorization', `Bearer ${operatorLogin.body.accessToken}`)
       .send({
         email: 'blocked@jobtap.test',
-        password: 'password123',
+        password: 'password1234',
         role: 'operator',
         status: 'active',
       })

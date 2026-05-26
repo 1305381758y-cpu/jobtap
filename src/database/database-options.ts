@@ -6,7 +6,6 @@ import { Job } from '../database/entities/job.entity';
 import { requireProductionEnv } from '../config/env';
 
 const SHARED_ENTITIES = [Job, AdminUser, AnalyticsEvent];
-requireProductionEnv();
 
 export function getDatabaseOptions(isTest: boolean): TypeOrmModuleOptions {
   if (isTest) {
@@ -23,6 +22,8 @@ export function getDatabaseOptions(isTest: boolean): TypeOrmModuleOptions {
 }
 
 export function getDataSourceOptions(): DataSourceOptions {
+  requireProductionEnv();
+
   return {
     type: 'postgres',
     url: process.env.DATABASE_URL,

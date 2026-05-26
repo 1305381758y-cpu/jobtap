@@ -18,6 +18,8 @@ export function configureCors(app: INestApplication): void {
   app.use((req: Request, res: Response, next: NextFunction) => {
     const origin = req.header('origin');
     const isAdminApi = req.path.startsWith('/api/admin');
+    // Admin APIs are locked to the configured console origins. Public mobile/employer
+    // APIs intentionally remain CORS-accessible because they are unauthenticated entrypoints.
     const adminOriginAllowed = !isAdminApi || !origin || allowedAdminOrigins.has(origin);
 
     if (origin && adminOriginAllowed) {
