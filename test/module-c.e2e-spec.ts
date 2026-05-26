@@ -803,4 +803,65 @@ describe('JobTap Module C', () => {
         .expect(201);
     });
   });
+
+  describe('input validation hardening', () => {
+    it('rejects non-UUID job id parameters with 400', async () => {
+      await request(app.getHttpServer())
+        .get('/api/mobile/jobs/not-a-uuid')
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .get('/api/admin/jobs/not-a-uuid')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .patch('/api/admin/users/not-a-uuid')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ status: 'disabled' })
+        .expect(400);
+    });
+
+    it('rejects invalid status and source enum values on admin job list', async () => {
+      await request(app.getHttpServer())
+        .get('/api/admin/jobs')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .get('/api/admin/jobs')
+        .set('Authorization', `Bearer ${token}`)
+        .query({ status: 'invalid_status' })
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .get('/api/admin/jobs')
+        .set('Authorization', `Bearer ${token}`)
+        .query({ source: 'invalid_source' })
+        .expect(400);
+    });
+
+    it('rejects invalid countryCode filters on admin and mobile job detail endpoints', async () => {
+      await request(app.getHttpServer())
+        .get('/api/admin/jobs')
+        .set('Authorization', `Bearer ${token}`)
+        .query({ countryCode: 'USA' })
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .get('/api/mobile/jobs/00000000-0000-4000-8000-000000000001')
+        .query({ countryCode: 'USA' })
+        .expect(400);
+    });
+
+    it('rejects mobile job list when countryCode is missing', async () => {
+      await request(app.getHttpServer())
+        .get('/api/mobile/jobs')
+        .query({ page: 1 })
+        .expect(400)
+        .expect(({ body }) => {
+          expect(body.message).toContain('countryCode');
+        });
+    });
+  });
 });

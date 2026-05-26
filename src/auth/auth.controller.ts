@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { resolveRequestSource } from '../common/request-source';
 import { AuthService } from './auth.service';
@@ -31,7 +31,7 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard, OwnerGuard)
   @Patch('users/:id')
-  updateUser(@Param('id') id: string, @Body() dto: UpdateAdminUserDto) {
+  updateUser(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateAdminUserDto) {
     return this.authService.updateAdmin(id, dto);
   }
 }

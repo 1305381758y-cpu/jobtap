@@ -6,6 +6,7 @@ import {
   HttpException,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -27,6 +28,25 @@ type AuthenticatedRequest = Request & { admin: { sub: string; email: string; rol
 
 const EMPLOYER_SUBMISSION_LIMIT = 20;
 const EMPLOYER_SUBMISSION_WINDOW_MS = 10 * 60 * 1000;
+
+function normalizeOptionalCountryCode(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const normalized = value.trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(normalized)) {
+    throw new BadRequestException('countryCode must be a 2-letter country code');
+  }
+  return normalized;
+}
+
+function parseOptionalEnum<T extends Record<string, string>>(
+  value: string | undefined,
+  allowed: T,
+  field: string,
+): T[keyof T] | undefined {
+  if (value === undefined) return undefined;
+  if (Object.values(allowed).includes(value)) return value as T[keyof T];
+  throw new BadRequestException(`${field} must be one of: ${Object.values(allowed).join(', ')}`);
+}
 
 @Controller('api/employer/jobs')
 export class EmployerJobsController {
@@ -111,7 +131,7 @@ export class MobileJobsController {
 
   @Get('jobs')
   list(@Query('countryCode') countryCode: string, @Query('page') page?: string) {
-    const normalizedCountryCode = countryCode?.trim().toUpperCase();
+    const normalizedCountryCode = countryCode?.trim()?.toUpperCase();
     const parsedPage = page === undefined ? 1 : Number(page);
     if (!normalizedCountryCode || !/^[A-Z]{2}$/.test(normalizedCountryCode)) {
       throw new BadRequestException('countryCode must be a 2-letter country code');
@@ -124,8 +144,8 @@ export class MobileJobsController {
   }
 
   @Get('jobs/:id')
-  detail(@Param('id') id: string, @Query('countryCode') countryCode?: string) {
-    return this.jobsService.getApprovedJob(id, countryCode?.toUpperCase());
+  detail(@Param('id', ParseUUIDPipe) id: string, @Query('countryCode') countryCode?: string) {
+    return this.jobsService.getApprovedJob(id, normalizeOptionalCountryCode(countryCode));
   }
 }
 
@@ -137,14 +157,14 @@ export class AdminJobsController {
   @Get()
   list(
     @Query('countryCode') countryCode?: string,
-    @Query('status') status?: JobStatus,
-    @Query('source') source?: JobSource,
+    @Query('status') status?: string,
+    @Query('source') source?: string,
     @Query('search') search?: string,
   ) {
     return this.jobsService.listAdminJobs({
-      countryCode: countryCode?.toUpperCase(),
-      status,
-      source,
+      countryCode: normalizeOptionalCountryCode(countryCode),
+      status: parseOptionalEnum(status, JobStatus, 'status'),
+      source: parseOptionalEnum(source, JobSource, 'source'),
       search,
     });
   }
@@ -155,28 +175,28 @@ export class AdminJobsController {
   }
 
   @Get(':id')
-  detail(@Param('id') id: string) {
+  detail(@Param('id', ParseUUIDPipe) id: string) {
     return this.jobsService.getAdminJob(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateJobDto) {
+  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateJobDto) {
     return this.jobsService.updateJob(id, dto);
   }
 
   @Post(':id/approve')
-  approve(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+  approve(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
     return this.jobsService.approveJob(id, req.admin.sub);
   }
 
   @Post(':id/reject')
-  reject(@Param('id') id: string, @Body() dto: RejectJobDto, @Req() req: AuthenticatedRequest) {
+  reject(@Param('id', ParseUUIDPipe) id: string, @Body() dto: RejectJobDto, @Req() req: AuthenticatedRequest) {
     return this.jobsService.rejectJob(id, dto, req.admin.sub);
   }
 
   @Post(':id/remove')
   @UseGuards(JwtAuthGuard, OwnerGuard)
-  remove(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+  remove(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthenticatedRequest) {
     return this.jobsService.removeJob(id, req.admin.sub);
   }
 }

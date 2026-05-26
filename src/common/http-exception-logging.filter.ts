@@ -27,7 +27,13 @@ export class HttpExceptionLoggingFilter implements ExceptionFilter {
       ? response
       : { statusCode: status, message: response };
 
-    if (status >= 500 || req.path === '/api/admin/login' || req.path === '/api/employer/jobs') {
+    const shouldLog =
+      status >= 500 ||
+      req.path === '/api/admin/login' ||
+      req.path === '/api/employer/jobs' ||
+      (req.path.startsWith('/api/admin') && [401, 403].includes(status));
+
+    if (shouldLog) {
       const message = exception instanceof Error ? exception.message : String(exception);
       this.logger.warn({
         message,
