@@ -133,6 +133,14 @@ For a release job that must fail unless production signing is configured, add:
   -PreleaseKeyPassword=keypass
 ```
 
+For Google Play, build the signed app bundle with the approved upload key:
+
+```bash
+./gradlew clean :app:bundleRelease \
+  -PreleaseApiUrl=https://api.jobtap.app \
+  -PrequireReleaseSigning=true
+```
+
 After building the final artifact, verify the signer:
 
 ```bash
@@ -142,9 +150,11 @@ After building the final artifact, verify the signer:
 
 The signer must be the approved production/upload certificate, not `CN=Android Debug`.
 
+Release candidates set `android:allowBackup="false"` so app-local data is not included in Google backup/restore.
+
 ### Contact link QA matrix
 
-The app validates and opens contact links with Android native `ACTION_VIEW`. Unit tests cover `http`, `https`, `mailto`, `tel`, `sms`, WhatsApp, Telegram, and custom deep links. Before launch, run the same matrix on real devices with and without WhatsApp/Telegram installed and confirm that unsupported links show the failure snackbar instead of crashing.
+The app validates and opens contact links with Android native `ACTION_VIEW`. Unit tests cover `http`, `https`, `mailto`, `tel`, `sms`, `whatsapp://`, `https://wa.me`, `tg://`, `https://t.me`, and custom deep links. Before launch, run the same matrix on real devices with and without WhatsApp/Telegram installed and confirm that unsupported links show the failure snackbar instead of crashing.
 
 ### Country filtering QA
 

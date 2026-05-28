@@ -39,6 +39,7 @@ submitted or distributed.
 - [ ] Document the signing runbook location or release-system job name using non-secret references only. (Ops input)
 - [ ] Verify that the generated release artifact is signed with the approved production certificate fingerprint. (Ops input)
 - [ ] Confirm the generated release artifact is not signed by `CN=Android Debug`. (Ops input)
+- [ ] For Google Play, submit the `bundleRelease` AAB signed with the approved upload key. The current local upload-key certificate subject used for smoke builds is `CN=JobTap Upload`; treat it as approved only after operations backs up the keystore and records the fingerprint in the release evidence pack. (Ops input)
 - [ ] Record the verification evidence location without embedding certificates or private material. (Ops input)
 
 ### Production API Domain
@@ -73,6 +74,11 @@ submitted or distributed.
 - [ ] Save the previous known-good production artifact and metadata for rollback reference. (Ops input)
 - [ ] Define rollback criteria, decision owner, communication path, and expected rollback time. (Product input, Ops input)
 - [ ] Confirm the release can be halted, staged, or rolled back through the selected store/channel. (Ops input)
+
+### Android Manifest Release Settings
+
+- [x] Set `android:allowBackup="false"` for release candidates so app-local data is not included in Google backup/restore.
+- [ ] Confirm whether Google Play data safety answers need to mention any OS-level backup behavior. (Product input, Ops input)
 
 ## P1 Release Readiness
 

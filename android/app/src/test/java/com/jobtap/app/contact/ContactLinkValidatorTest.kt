@@ -117,6 +117,16 @@ class ContactLinkValidatorTest {
     }
 
     @Test
+    fun `whatsapp https link is valid`() {
+        assertTrue(ContactLinkValidator.isValid("https://wa.me/1234567890"))
+    }
+
+    @Test
+    fun `custom product deep link is valid`() {
+        assertTrue(ContactLinkValidator.isValid("jobtap://support/report-result"))
+    }
+
+    @Test
     fun `data URL is invalid`() {
         assertFalse(ContactLinkValidator.isValid("data:text/html,Hello"))
     }

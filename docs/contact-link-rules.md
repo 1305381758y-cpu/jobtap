@@ -60,6 +60,8 @@ Before a production release, verify native Android `ACTION_VIEW` handling on rea
 
 For WhatsApp and Telegram, test both installed and not-installed states. If no app can handle the link, Android must show the JobTap failure snackbar instead of crashing.
 
+Record each real-device result with device model, Android version, app `versionName`, app `versionCode`, network type, protocol, installed/not-installed state for optional apps, observed target app, and pass/fail notes.
+
 ## Implementation Status
 
 | Platform | File | Status |
