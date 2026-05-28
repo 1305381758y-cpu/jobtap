@@ -1,23 +1,72 @@
+import java.net.URI
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
 
 fun String.isUnsafeReleaseUrl(): Boolean {
-    val lower = this.lowercase()
-    return lower.isBlank() ||
-        lower.startsWith("http://") ||
-        lower.startsWith("https://localhost") ||
-        lower.startsWith("https://127.0.0.1") ||
-        lower.startsWith("https://10.0.2.2") ||
-        lower.startsWith("https://0.0.0.0") ||
-        lower == "https://" ||
-        lower == "https://."
+    val trimmed = trim()
+    if (trimmed.isBlank()) return true
+
+    val uri = runCatching { URI(trimmed) }.getOrNull() ?: return true
+    val host = uri.host
+        ?.lowercase()
+        ?.trimEnd('.')
+        ?.removeSurrounding("[", "]")
+        ?: return true
+    val unsafeDomains = setOf(
+        "localhost",
+        "127.0.0.1",
+        "0:0:0:0:0:0:0:1",
+        "::1",
+        "10.0.2.2",
+        "0.0.0.0",
+    )
+    val placeholderHosts = setOf("example", "test", "invalid")
+    val isKnownUnsafe = unsafeDomains.any { host == it || host.endsWith(".$it") }
+    val isPlaceholder = host in placeholderHosts || host.endsWith(".invalid") || host.endsWith(".test")
+    val isExampleWildcard = host.startsWith("example.") || host.contains(".example.")
+
+    return uri.scheme?.lowercase() != "https" ||
+        !host.contains(".") ||
+        isKnownUnsafe ||
+        isPlaceholder ||
+        isExampleWildcard
 }
 
 fun propOrEnv(propertyName: String, envName: String): String? {
     return project.findProperty(propertyName)?.toString()
         ?: System.getenv(envName)
+}
+
+fun boolPropOrEnv(propertyName: String, envName: String): Boolean {
+    return propOrEnv(propertyName, envName)?.trim()?.lowercase() in setOf("1", "true", "yes")
+}
+
+fun List<String>.requestsReleaseArtifact(): Boolean {
+    fun String.matchesCamelCaseAbbreviation(target: String): Boolean {
+        val candidate = lowercase()
+        val first = target.substringBefore("Release").lowercase()
+        val second = "release"
+
+        return (1..first.length).any { firstLength ->
+            (1..second.length).any { secondLength ->
+                candidate == first.take(firstLength) + second.take(secondLength)
+            }
+        }
+    }
+
+    return any { taskName ->
+        val simple = taskName.substringAfterLast(":")
+        val lower = simple.lowercase()
+
+        if (lower.contains("release")) return@any true
+        if (lower in setOf("assemble", "bundle", "build")) return@any true
+
+        listOf("assembleRelease", "bundleRelease", "buildRelease")
+            .any { simple.matchesCamelCaseAbbreviation(it) }
+    }
 }
 
 android {
@@ -64,12 +113,13 @@ android {
             )
 
             val defaultReleaseUrl = "https://api.jobtap.app"
-            val releaseUrl = (propOrEnv("releaseApiUrl", "JOBTAP_RELEASE_API_BASE_URL") ?: defaultReleaseUrl)
+            val releaseUrl = (propOrEnv("releaseApiUrl", "JOBTAP_RELEASE_API_BASE_URL") ?: defaultReleaseUrl).trim()
                 .also { url ->
                     if (url.isUnsafeReleaseUrl()) {
                         throw GradleException(
                             "Release API URL '$url' is unsafe. Release builds must use " +
-                            "HTTPS with a valid production host (not localhost/127.0.0.1/10.0.2.2/http). " +
+                            "HTTPS with a valid production host (not localhost/127.0.0.1/10.0.2.2/" +
+                            "example.* or http). " +
                             "Configure via -PreleaseApiUrl=https://your-api.com or JOBTAP_RELEASE_API_BASE_URL."
                         )
                     }
@@ -77,14 +127,37 @@ android {
             buildConfigField("String", "API_BASE_URL", "\"$releaseUrl\"")
 
             val releaseSigning = signingConfigs.findByName("release")
-            val hasReleaseKey = releaseSigning?.storeFile?.exists() == true &&
-                releaseSigning.storePassword != null &&
-                releaseSigning.keyAlias != null &&
-                releaseSigning.keyPassword != null
+            val signingInputs = listOf(
+                propOrEnv("releaseStoreFile", "JOBTAP_RELEASE_STORE_FILE"),
+                propOrEnv("releaseStorePassword", "JOBTAP_RELEASE_STORE_PASSWORD"),
+                propOrEnv("releaseKeyAlias", "JOBTAP_RELEASE_KEY_ALIAS"),
+                propOrEnv("releaseKeyPassword", "JOBTAP_RELEASE_KEY_PASSWORD"),
+            )
+            val anySigningInput = signingInputs.any { !it.isNullOrBlank() }
+            val hasReleaseKey = releaseSigning?.storeFile?.isFile == true &&
+                !releaseSigning.storePassword.isNullOrBlank() &&
+                !releaseSigning.keyAlias.isNullOrBlank() &&
+                !releaseSigning.keyPassword.isNullOrBlank()
+            val requiresSignedRelease = boolPropOrEnv("requireReleaseSigning", "JOBTAP_REQUIRE_RELEASE_SIGNING")
+            val isReleaseArtifactRequest = gradle.startParameter.taskNames.requestsReleaseArtifact()
+
+            if (isReleaseArtifactRequest && anySigningInput && !hasReleaseKey) {
+                throw GradleException(
+                    "Release signing configuration is incomplete or the keystore file does not exist. " +
+                    "Provide releaseStoreFile, releaseStorePassword, releaseKeyAlias, and releaseKeyPassword."
+                )
+            }
             if (hasReleaseKey) {
                 signingConfig = releaseSigning
-            } else {
-                signingConfig = signingConfigs.getByName("debug")
+            } else if (isReleaseArtifactRequest && requiresSignedRelease) {
+                throw GradleException(
+                    "Signed release artifact required, but no production release signing configuration was provided."
+                )
+            } else if (isReleaseArtifactRequest) {
+                logger.warn(
+                    "WARNING: Release signing not configured. The release artifact will be unsigned, " +
+                    "not debug-signed. Provide release signing properties for Play/App Store submission."
+                )
             }
         }
     }

@@ -5,7 +5,9 @@
 ### Android App
 - Static strings used by the `MainActivity` display layer (badge labels, time labels) are resource-backed via `stringResource(R.string.xyz)`; the `Job` model and `JobMapper` remain locale-agnostic.
 - Base English strings are defined in `res/values/strings.xml`.
-- Resource directory skeletons exist for all PRD languages but contain only `app_name` and a locale marker; untranslated strings fall back to the base English values via Android resource resolution.
+- Resource directories exist for all PRD languages and contain every Android string key so Android lint does not fail for missing translations.
+- English (`values/`) and Chinese (`values-zh/`) have localized user-facing copy.
+- Spanish, French, German, Portuguese, Japanese, Korean, Arabic, and Hindi currently contain English fallback copy plus a locale marker. They are safe for runtime resource resolution but are **not** production-quality translations.
 
 ### Admin Frontend
 - A lightweight i18n catalog (`frontend/src/i18n.ts`) defines `SUPPORTED_LOCALES`, `DEFAULT_ADMIN_LOCALE`, and an admin message catalog in Chinese (the current default).
@@ -30,14 +32,14 @@
 ## Fallback Behavior
 
 ### Android
-Android resource resolution automatically falls back to `values/` (English) when a string is not defined in a locale-specific `values-*/strings.xml`. No custom fallback logic is needed.
+Android resource resolution automatically falls back to `values/` (English) when a string is not defined in a locale-specific `values-*/strings.xml`. The current non-English/non-Chinese resource files intentionally duplicate English copy to make fallback behavior explicit and prevent missing-resource crashes.
 
 ### Frontend
 The i18n helper `t(locale, key)` looks up the key in the current locale's catalog. If not found, it falls back to `DEFAULT_ADMIN_LOCALE` (Chinese). If still not found, it returns the key itself.
 
 ## Remaining Work
 
-1. **Android**: Translate `strings.xml` for each of the 9 non-English locales (zh, es, fr, de, pt, ja, ko, ar, hi).
+1. **Android**: Translate `strings.xml` for each locale that Product wants to list as localized in Google Play. Current production-ready languages are English and Chinese only.
 2. **Frontend**: Populate message catalogs for each supported locale in `i18n.ts`.
 3. **Frontend**: Replace remaining hardcoded Chinese strings in `App.tsx` (login page, employer submission form, navigation, etc.) with `t()` calls.
 4. **Android**: Add locale picker in Settings screen (currently shows "Language: English" as a hardcoded row).

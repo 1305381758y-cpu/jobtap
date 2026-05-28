@@ -34,8 +34,11 @@ submitted or distributed.
 - [ ] Confirm the final production signing strategy: Play App Signing, local signing, or other approved release process. (Ops input)
 - [ ] Confirm the production keystore/key alias exists in the approved secret store or release system. Do not add secrets to this repository. (Ops input)
 - [ ] Confirm signing credentials are accessible only to approved release operators. (Ops input)
+- [ ] Configure the release job with `releaseStoreFile`, `releaseStorePassword`, `releaseKeyAlias`, and `releaseKeyPassword` or the matching `JOBTAP_RELEASE_*` environment variables. (Ops input)
+- [ ] Run the final release job with `-PrequireReleaseSigning=true` or `JOBTAP_REQUIRE_RELEASE_SIGNING=true` so missing signing credentials fail the build. (Ops input)
 - [ ] Document the signing runbook location or release-system job name using non-secret references only. (Ops input)
 - [ ] Verify that the generated release artifact is signed with the approved production certificate fingerprint. (Ops input)
+- [ ] Confirm the generated release artifact is not signed by `CN=Android Debug`. (Ops input)
 - [ ] Record the verification evidence location without embedding certificates or private material. (Ops input)
 
 ### Production API Domain
@@ -45,24 +48,23 @@ submitted or distributed.
 - [ ] Confirm TLS certificate validity, hostname matching, and certificate-chain compatibility on supported Android versions. (Ops input)
 - [ ] Confirm environment separation between development, staging, and production API domains. (Ops input)
 - [ ] Confirm no staging, localhost, debug, or mock API endpoint is present in the release artifact. (Ops input)
+- [ ] Confirm release URL validation rejects `http://`, localhost, emulator loopback, IPv6 loopback, `example.*`, and placeholder hosts. (Ops input)
 - [ ] Confirm backend rate limits, auth settings, CORS-equivalent mobile policies, and monitoring are production-ready. (Ops input)
 
-### Real-Device Multi-Protocol Integration
+### Real-Device Contact-Link Integration
 
-- [ ] Define the required protocol matrix for the release. Examples: HTTPS, WebSocket, deep links, push notifications, file upload/download, OAuth redirects, SMS/email handoff, and third-party SDK callbacks. (Product input, Ops input)
-- [ ] Test the protocol matrix on physical Android devices, not only emulators.
+- [ ] Test the required contact link matrix on physical Android devices, not only emulators: `http`, `https`, `mailto`, `tel`, `sms`, `whatsapp://`, `https://wa.me`, `tg://`, `https://t.me`, and one approved custom deep link.
+- [ ] Test with WhatsApp/Telegram installed and not installed.
+- [ ] Confirm unsupported links show the failure snackbar and never crash.
 - [ ] Include at least one low-end supported Android device and one current Android device in the test matrix.
 - [ ] Test on Wi-Fi, cellular, airplane-mode recovery, weak network, and network switching scenarios.
-- [ ] Verify login, logout, token refresh, session expiry, and account recovery across all required protocols. (Product input for expected behavior)
-- [ ] Verify deep links and app links against the production domain or approved release-domain equivalent. (Ops input)
-- [ ] Verify push notification registration, delivery, tap-through, and opt-out behavior if push is in scope. (Product input, Ops input)
-- [ ] Verify any payment, subscription, or store billing flows on real devices if included in the release scope. (Product input, Ops input)
 - [ ] Capture device model, OS version, app version, network type, protocol, result, and issue link for each run.
 
 ### Versioning, Release Notes, and Rollback Package
 
 - [ ] Confirm the final `versionCode` for this release is higher than every previously shipped Android artifact. (Ops input)
 - [ ] Confirm the final `versionName` matches the product release plan. (Product input)
+- [ ] For first public release only, `versionCode=1` and `versionName=1.0.0` are acceptable; otherwise increment before upload. (Product input, Ops input)
 - [ ] Confirm version metadata is visible in the app or support diagnostics if required. (Product input)
 - [ ] Draft release notes for store listing and in-app/support channels. (Product input)
 - [ ] Review release notes for accuracy, unsupported claims, regulatory wording, and localization needs. (Product input, Ops input if compliance review is required)

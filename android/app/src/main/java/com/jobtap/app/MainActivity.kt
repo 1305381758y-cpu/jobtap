@@ -141,7 +141,7 @@ private fun JobTapApp() {
     val analyticsFactory = remember {
         val deviceIdStore = SharedPreferencesDeviceIdStore(context)
         val deviceIdProvider = DeviceIdProvider(deviceIdStore) { java.util.UUID.randomUUID().toString() }
-        AnalyticsEventFactory(deviceIdProvider, appVersion = "1.0.0")
+        AnalyticsEventFactory(deviceIdProvider, appVersion = BuildConfig.VERSION_NAME)
     }
 
     val apiClient = remember {
