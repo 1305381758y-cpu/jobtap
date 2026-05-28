@@ -13,9 +13,13 @@
     "test:e2e": "jest --config jest-e2e.json --runInBand",
     "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
     "typeorm": "typeorm-ts-node-commonjs",
+    "typeorm:prod": "typeorm",
     "migration:run": "npm run typeorm -- migration:run -d src/database/data-source.ts",
+    "migration:run:prod": "npm run typeorm:prod -- migration:run -d dist/database/data-source.js",
     "migration:revert": "npm run typeorm -- migration:revert -d src/database/data-source.ts",
+    "migration:revert:prod": "npm run typeorm:prod -- migration:revert -d dist/database/data-source.js",
     "migration:show": "npm run typeorm -- migration:show -d src/database/data-source.ts",
+    "migration:show:prod": "npm run typeorm:prod -- migration:show -d dist/database/data-source.js",
     "migration:generate": "npm run typeorm -- migration:generate src/database/migrations/GeneratedMigration -d src/database/data-source.ts"
   },
   "dependencies": {

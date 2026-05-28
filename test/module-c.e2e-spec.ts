@@ -266,6 +266,67 @@ describe('JobTap Module C', () => {
     });
   });
 
+  it('reports country active users and counts contact clicks only after same-job detail views', async () => {
+    const job = await request(app.getHttpServer())
+      .post('/api/admin/jobs')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: 'Launch statistics check',
+        employerName: 'MetricWorks',
+        countryCode: 'BR',
+        isRemote: true,
+        salaryText: '$22/hour',
+        workTimeText: 'Flexible',
+        description: 'Temporary job used to verify final launch statistics semantics.',
+        contactUrl: 'https://example.com/statistics-check',
+        status: 'approved',
+      })
+      .expect(201);
+
+    const baseEvent = {
+      countryCode: 'BR',
+      platform: 'android',
+      eventSchemaVersion: 1,
+    };
+
+    await request(app.getHttpServer())
+      .post('/api/mobile/analytics/events')
+      .send({ ...baseEvent, eventType: 'app_open', deviceId: 'country-active-a' })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post('/api/mobile/analytics/events')
+      .send({ ...baseEvent, eventType: 'app_open', deviceId: 'country-active-b' })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post('/api/mobile/analytics/events')
+      .send({ ...baseEvent, eventType: 'job_detail_view', deviceId: 'country-active-a', jobId: job.body.id })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post('/api/mobile/analytics/events')
+      .send({ ...baseEvent, eventType: 'contact_click', deviceId: 'country-active-a', jobId: job.body.id })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post('/api/mobile/analytics/events')
+      .send({ ...baseEvent, eventType: 'contact_click', deviceId: 'country-active-b', jobId: job.body.id })
+      .expect(201);
+
+    const stats = await request(app.getHttpServer())
+      .get('/api/admin/statistics')
+      .set('Authorization', `Bearer ${token}`)
+      .query({ countryCode: 'BR', jobId: job.body.id })
+      .expect(200);
+
+    expect(stats.body.items).toHaveLength(1);
+    expect(stats.body.items[0]).toMatchObject({
+      countryCode: 'BR',
+      jobId: job.body.id,
+      activeUsers: 2,
+      detailViews: 1,
+      contactClicks: 1,
+      contactClickRate: 1,
+    });
+  });
+
   it('rejects invalid analytics statistics date filters', async () => {
     await request(app.getHttpServer())
       .get('/api/admin/statistics')
@@ -786,6 +847,18 @@ describe('JobTap Module C', () => {
       await request(app.getHttpServer())
         .post('/api/employer/jobs')
         .send({ ...validJob, contactUrl: 'http:' })
+        .expect(400);
+    });
+
+    it('rejects links with embedded whitespace or control characters', async () => {
+      await request(app.getHttpServer())
+        .post('/api/employer/jobs')
+        .send({ ...validJob, contactUrl: 'https://example.com/unsafe path' })
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .post('/api/employer/jobs')
+        .send({ ...validJob, contactUrl: 'java\nscript:alert(1)' })
         .expect(400);
     });
 

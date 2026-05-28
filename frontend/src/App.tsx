@@ -1,4 +1,4 @@
-import { FormEvent, ReactNode, useEffect, useState } from 'react';
+import { Fragment, FormEvent, ReactNode, useEffect, useState } from 'react';
 import {
   AlertCircle,
   BarChart3,
@@ -601,6 +601,7 @@ function ReviewQueue({ token }: { token: string }) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -650,23 +651,58 @@ function ReviewQueue({ token }: { token: string }) {
             </tr>
           </thead>
           <tbody>
-            {loading ? <LoadingRow colSpan={7} /> : jobs.map((job) => (
-              <tr key={job.id}>
-                <td>
-                  <strong>{job.title}</strong>
-                  <span className="muted block">{job.id.slice(0, 8)}</span>
-                </td>
-                <td>{job.employerName}</td>
-                <td>{job.countryCode}</td>
-                <td>{job.salaryText}</td>
-                <td>{job.workTimeText}</td>
-                <td>{formatDate(job.createdAt)}</td>
-                <td className="actions">
-                  <button onClick={() => void act('approve', job)}>通过</button>
-                  <button className="danger-link" onClick={() => void act('reject', job)}>拒绝</button>
-                </td>
-              </tr>
-            ))}
+            {loading ? <LoadingRow colSpan={7} /> : jobs.map((job) => {
+              const expanded = expandedJobId === job.id;
+              return (
+                <Fragment key={job.id}>
+                  <tr>
+                    <td>
+                      <strong>{job.title}</strong>
+                      <span className="muted block">{job.id.slice(0, 8)}</span>
+                    </td>
+                    <td>{job.employerName}</td>
+                    <td>{job.countryCode}</td>
+                    <td>{job.salaryText}</td>
+                    <td>{job.workTimeText}</td>
+                    <td>{formatDate(job.createdAt)}</td>
+                    <td className="actions">
+                      <button onClick={() => setExpandedJobId(expanded ? null : job.id)}>
+                        {expanded ? '收起详情' : '查看详情'}
+                      </button>
+                      <button onClick={() => void act('approve', job)}>通过</button>
+                      <button className="danger-link" onClick={() => void act('reject', job)}>拒绝</button>
+                    </td>
+                  </tr>
+                  {expanded ? (
+                    <tr className="detail-row">
+                      <td colSpan={7}>
+                        <div className="review-detail-card">
+                          <div className="detail-grid">
+                            <DetailItem label="岗位 ID" value={job.id} mono />
+                            <DetailItem label="城市" value={job.city || '-'} />
+                            <DetailItem label="远程" value={job.isRemote ? '是' : '否'} />
+                            <DetailItem label="来源" value={job.source === 'employer_submitted' ? '雇主提交' : '后台创建'} />
+                          </div>
+                          <div className="detail-section">
+                            <span>职位描述</span>
+                            <p>{job.description}</p>
+                          </div>
+                          <div className="detail-section">
+                            <span>联系链接</span>
+                            <div className="contact-preview">
+                              <code>{job.contactUrl}</code>
+                              <a href={job.contactUrl} target="_blank" rel="noreferrer noopener">
+                                打开测试
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              );
+            })}
             {!loading && jobs.length === 0 ? <EmptyRow colSpan={7} /> : null}
           </tbody>
         </table>
@@ -725,6 +761,11 @@ function JobsPage({ token }: { token: string }) {
 
   async function submitJob(event: FormEvent) {
     event.preventDefault();
+    const nextErrors = validateEmployerJobForm(form);
+    if (Object.keys(nextErrors).length > 0) {
+      setError(Object.values(nextErrors).filter(Boolean)[0] ?? '请检查职位表单');
+      return;
+    }
     try {
       if (editingJob) {
         await updateJob(token, editingJob.id, form);
@@ -837,14 +878,18 @@ function StatisticsPage({ token }: { token: string }) {
     void load();
   }, []);
 
+  const activeUsersByCountry = new Map<string, number>();
+  items.forEach((item) => {
+    activeUsersByCountry.set(item.countryCode, item.activeUsers);
+  });
   const totals = items.reduce(
     (sum, item) => ({
-      activeUsers: sum.activeUsers + item.activeUsers,
       detailViews: sum.detailViews + item.detailViews,
       contactClicks: sum.contactClicks + item.contactClicks,
     }),
-    { activeUsers: 0, detailViews: 0, contactClicks: 0 },
+    { detailViews: 0, contactClicks: 0 },
   );
+  const countryActiveUsers = Array.from(activeUsersByCountry.values()).reduce((sum, value) => sum + value, 0);
   const averageRate = totals.detailViews ? totals.contactClicks / totals.detailViews : 0;
 
   return (
@@ -864,7 +909,7 @@ function StatisticsPage({ token }: { token: string }) {
         <button onClick={() => setFilters({ range: 'all', countryCode: '', jobId: '', startDate: '', endDate: '' })}>重置</button>
       </div>
       <div className="metric-grid">
-        <MetricCard label="活跃人数" value={totals.activeUsers.toLocaleString()} />
+        <MetricCard label="国家活跃人数" value={countryActiveUsers.toLocaleString()} />
         <MetricCard label="浏览详情人数" value={totals.detailViews.toLocaleString()} />
         <MetricCard label="点击联系人数" value={totals.contactClicks.toLocaleString()} />
         <MetricCard label="平均联系点击率" value={`${(averageRate * 100).toFixed(1)}%`} />
@@ -1055,6 +1100,15 @@ function SettingsPage({ session, onLogout }: { session: Session; onLogout: () =>
         </Drawer>
       ) : null}
     </PageFrame>
+  );
+}
+
+function DetailItem({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="detail-item">
+      <span>{label}</span>
+      <strong className={mono ? 'mono' : undefined}>{value}</strong>
+    </div>
   );
 }
 

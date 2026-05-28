@@ -19,9 +19,13 @@ type StatisticsQuery = {
 type StatisticsRow = {
   countryCode: string;
   jobId: string;
-  activeUsers: string | number;
   detailViews: string | number;
   contactClicks: string | number;
+};
+
+type CountryActiveRow = {
+  countryCode: string;
+  activeUsers: string | number;
 };
 
 @Injectable()
@@ -54,7 +58,13 @@ export class AnalyticsService {
   }
 
   async statistics(query: StatisticsQuery): Promise<{ items: Array<Record<string, unknown>> }> {
-    const rows = await this.buildStatisticsQuery(query).getRawMany<StatisticsRow>();
+    const [rows, countryActiveRows] = await Promise.all([
+      this.buildStatisticsQuery(query).getRawMany<StatisticsRow>(),
+      this.buildCountryActiveQuery(query).getRawMany<CountryActiveRow>(),
+    ]);
+    const activeUsersByCountry = new Map(
+      countryActiveRows.map((row) => [row.countryCode, Number(row.activeUsers)]),
+    );
 
     return {
       items: rows.map((row) => {
@@ -62,7 +72,7 @@ export class AnalyticsService {
         const contactClicks = Number(row.contactClicks);
         return {
           countryCode: row.countryCode,
-          activeUsers: Number(row.activeUsers),
+          activeUsers: activeUsersByCountry.get(row.countryCode) ?? 0,
           jobId: row.jobId,
           detailViews,
           contactClicks,
@@ -77,13 +87,12 @@ export class AnalyticsService {
       .createQueryBuilder('event')
       .select('event.countryCode', 'countryCode')
       .addSelect('event.jobId', 'jobId')
-      .addSelect('COUNT(DISTINCT event.deviceId)', 'activeUsers')
       .addSelect(
         'COUNT(DISTINCT CASE WHEN event.eventType = :detailType THEN event.deviceId END)',
         'detailViews',
       )
       .addSelect(
-        'COUNT(DISTINCT CASE WHEN event.eventType = :clickType THEN event.deviceId END)',
+        `COUNT(DISTINCT CASE WHEN event.eventType = :clickType AND ${this.sameJobDetailExistsClause(query)} THEN event.deviceId END)`,
         'contactClicks',
       )
       .where('event.jobId IS NOT NULL')
@@ -96,18 +105,31 @@ export class AnalyticsService {
         clickType: AnalyticsEventType.ContactClick,
       });
 
-    this.applyStatisticsFilters(qb, query);
+    this.applyStatisticsFilters(qb, query, { includeJobFilter: true });
+    return qb;
+  }
+
+  private buildCountryActiveQuery(query: StatisticsQuery): SelectQueryBuilder<AnalyticsEvent> {
+    const qb = this.events
+      .createQueryBuilder('event')
+      .select('event.countryCode', 'countryCode')
+      .addSelect('COUNT(DISTINCT event.deviceId)', 'activeUsers')
+      .groupBy('event.countryCode')
+      .orderBy('event.countryCode', 'ASC');
+
+    this.applyStatisticsFilters(qb, query, { includeJobFilter: false });
     return qb;
   }
 
   private applyStatisticsFilters(
     qb: SelectQueryBuilder<AnalyticsEvent>,
     query: StatisticsQuery,
+    options: { includeJobFilter: boolean },
   ): void {
     if (query.countryCode) {
       qb.andWhere('event.countryCode = :countryCode', { countryCode: query.countryCode.toUpperCase() });
     }
-    if (query.jobId) {
+    if (options.includeJobFilter && query.jobId) {
       qb.andWhere('event.jobId = :jobId', { jobId: query.jobId });
     }
 
@@ -126,6 +148,28 @@ export class AnalyticsService {
 
     const startDate = this.resolveStartDate(query);
     if (startDate) qb.andWhere('event.createdAt >= :startDate', { startDate });
+  }
+
+  private sameJobDetailExistsClause(query: StatisticsQuery): string {
+    const dateClause = this.detailExistsDateClause(query);
+    return `EXISTS (
+      SELECT 1 FROM analytics_events detail
+      WHERE detail.countryCode = event.countryCode
+        AND detail.jobId = event.jobId
+        AND detail.deviceId = event.deviceId
+        AND detail.eventType = :detailType
+        ${dateClause}
+    )`;
+  }
+
+  private detailExistsDateClause(query: StatisticsQuery): string {
+    if (query.startDate && query.endDate) {
+      return 'AND detail.createdAt BETWEEN :startDate AND :endDate';
+    }
+    if (this.resolveStartDate(query)) {
+      return 'AND detail.createdAt >= :startDate';
+    }
+    return '';
   }
 
   private resolveStartDate(query: StatisticsQuery): Date | undefined {

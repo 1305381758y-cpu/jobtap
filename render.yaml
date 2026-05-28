@@ -5,6 +5,7 @@ services:
     plan: starter
     healthCheckPath: /health
     dockerfilePath: ./Dockerfile
+    preDeployCommand: npm run migration:run:prod
     autoDeploy: false
     envVars:
       - key: NODE_ENV

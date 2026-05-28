@@ -17,9 +17,15 @@ const BLOCKED_CONTACT_PROTOCOLS = new Set([
 ]);
 
 function isContactLinkValid(url: string): string | null {
+  const trimmed = url.trim();
+  if (!trimmed) return 'Contact link must not be empty';
+  if (/[\u0000-\u001F\u007F\s]/.test(trimmed)) {
+    return 'Contact link must not contain whitespace or control characters';
+  }
+
   let parsed: URL;
   try {
-    parsed = new URL(url);
+    parsed = new URL(trimmed);
   } catch {
     return 'Contact link must be a valid URL or URI';
   }
@@ -35,12 +41,12 @@ function isContactLinkValid(url: string): string | null {
       return 'Contact link must have a host';
     }
   } else if (scheme === 'mailto' || scheme === 'tel' || scheme === 'sms') {
-    const ssp = url.slice(url.indexOf(':') + 1);
+    const ssp = trimmed.slice(trimmed.indexOf(':') + 1);
     if (!ssp || ssp.length === 0) {
       return 'Contact link scheme-specific part must not be empty';
     }
   } else {
-    const ssp = url.slice(url.indexOf(':') + 1);
+    const ssp = trimmed.slice(trimmed.indexOf(':') + 1);
     if (!ssp || ssp.length === 0) {
       return 'Contact link scheme-specific part must not be empty';
     }

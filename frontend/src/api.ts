@@ -66,7 +66,9 @@ export type AdminPayload = {
   status: AdminStatus;
 };
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
+// Empty means same-origin deployment. Set VITE_API_BASE_URL when the admin SPA
+// is hosted separately from the JobTap API, for example on Vercel.
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
 
 export class ApiError extends Error {
   status: number;
