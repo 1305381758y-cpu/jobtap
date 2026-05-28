@@ -41,6 +41,7 @@
     <string name="jobs_load_more">加载更多</string>
     <string name="jobs_no_more">没有更多职位了</string>
     <string name="jobs_retry">重试</string>
+    <string name="jobs_country_auto_note">正在展示根据自动识别国家匹配的职位。国家区域不可手动选择。</string>
 
     <!-- Job detail screen -->
     <string name="detail_title">职位详情</string>

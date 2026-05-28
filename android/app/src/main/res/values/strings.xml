@@ -41,6 +41,7 @@
     <string name="jobs_load_more">Load More</string>
     <string name="jobs_no_more">No more jobs</string>
     <string name="jobs_retry">Retry</string>
+    <string name="jobs_country_auto_note">Showing jobs matched to your detected country. Country selection is automatic.</string>
 
     <!-- Job detail screen -->
     <string name="detail_title">Job Details</string>
