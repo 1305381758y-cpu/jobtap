@@ -13,6 +13,7 @@ coverage/
 .playwright-cli/
 output/playwright/
 .worktrees/
+memory/
 **/build/
 **/.gradle/
 local.properties
