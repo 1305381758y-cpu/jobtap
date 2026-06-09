@@ -112,7 +112,7 @@ android {
                 "proguard-rules.pro"
             )
 
-            val defaultReleaseUrl = "https://api.jobtap.app"
+            val defaultReleaseUrl = "https://api.jobtap.work"
             val releaseUrl = (propOrEnv("releaseApiUrl", "JOBTAP_RELEASE_API_BASE_URL") ?: defaultReleaseUrl).trim()
                 .also { url ->
                     if (url.isUnsafeReleaseUrl()) {

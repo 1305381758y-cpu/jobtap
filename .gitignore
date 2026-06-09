@@ -12,6 +12,7 @@ coverage/
 *~
 .playwright-cli/
 output/playwright/
+output/
 .worktrees/
 memory/
 **/build/

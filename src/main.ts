@@ -17,6 +17,13 @@ function serveAdminConsole(app: INestApplication): void {
 
   app.use(express.static(frontendDist));
   app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.method === 'GET' && req.path === '/privacy') {
+      const privacyPath = join(frontendDist, 'privacy', 'index.html');
+      if (existsSync(privacyPath)) {
+        res.sendFile(privacyPath);
+        return;
+      }
+    }
     if (req.method === 'GET' && !req.path.startsWith('/api') && req.path !== '/health') {
       res.sendFile(indexPath);
       return;

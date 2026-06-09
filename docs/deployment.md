@@ -51,6 +51,16 @@ docker build -t jobtap-module-c .
 docker run --env-file .env -p 3000:3000 jobtap-module-c
 ```
 
+## GCP Cloud Run
+
+The intended GCP production path is Cloud Run + Cloud SQL for PostgreSQL +
+Artifact Registry + Secret Manager, with migrations executed through a Cloud Run
+Job before deploying the web service.
+
+See `docs/gcp-cloud-run-deployment.md` for the resource list, migration job,
+Cloud Run deployment command, `/health` verification, and `api.jobtap.work`
+domain-mapping steps.
+
 ## Admin Console
 
 The backend Docker image serves `frontend/dist` when present. For separate static hosting, build with:

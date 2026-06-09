@@ -40,7 +40,7 @@ import type { SupportedLocale } from './i18n';
 import { COUNTRY_OPTIONS, type CountryOption } from './countryOptions';
 
 type Page = 'review' | 'jobs' | 'statistics' | 'settings';
-type View = 'admin' | 'submit';
+type View = 'admin' | 'submit' | 'privacy';
 type Session = { token: string; email: string; role: AdminRole };
 type EmployerJobForm = Omit<EmployerJobPayload, 'city'> & { city: string };
 type EmployerJobFormErrors = Partial<Record<keyof EmployerJobForm, string>>;
@@ -55,7 +55,7 @@ const initialJobForm: JobPayload = {
   workTimeText: '',
   description: '',
   contactUrl: '',
-  status: 'pending',
+  status: 'approved',
 };
 
 const initialEmployerJobForm: EmployerJobForm = {
@@ -111,6 +111,7 @@ function getInitialView(): View {
   if (typeof window === 'undefined') return 'admin';
   const search = new URLSearchParams(window.location.search);
   if (search.get('mode') === 'submit' || window.location.pathname === '/submit') return 'submit';
+  if (search.get('mode') === 'privacy' || window.location.pathname === '/privacy') return 'privacy';
   return 'admin';
 }
 
@@ -131,14 +132,21 @@ function normalizeEmployerJobForm(form: EmployerJobForm): EmployerJobPayload {
 function validateEmployerJobForm(form: EmployerJobPayload): EmployerJobFormErrors {
   const errors: EmployerJobFormErrors = {};
   if (form.title.trim().length < 2) errors.title = '请输入至少 2 个字符的职位标题';
+  if (form.title.trim().length > 120) errors.title = '职位标题不能超过 120 个字符';
   if (form.employerName.trim().length < 2) errors.employerName = '请输入雇主名称';
+  if (form.employerName.trim().length > 120) errors.employerName = '雇主名称不能超过 120 个字符';
   if (!/^[A-Z]{2}$/.test(form.countryCode.trim().toUpperCase())) errors.countryCode = '请输入 2 位国家代码，例如 US';
   if ((form.city ?? '').trim().length > 120) errors.city = '城市名不能超过 120 个字符';
   if (!form.salaryText.trim()) errors.salaryText = '请输入薪资信息';
+  if (form.salaryText.trim().length > 120) errors.salaryText = '薪资信息不能超过 120 个字符';
   if (!form.workTimeText.trim()) errors.workTimeText = '请输入工时或班次信息';
+  if (form.workTimeText.trim().length > 120) errors.workTimeText = '工时说明不能超过 120 个字符';
   if (form.description.trim().length < 10) errors.description = '职位描述至少需要 10 个字符';
+  if (form.description.trim().length > 5000) errors.description = '职位描述不能超过 5000 个字符';
   if (!form.contactUrl.trim()) {
     errors.contactUrl = '请输入联系链接';
+  } else if (form.contactUrl.trim().length > 1000) {
+    errors.contactUrl = '联系链接不能超过 1000 个字符';
   } else {
     const result = validateContactLink(form.contactUrl.trim());
     if (result) {
@@ -229,6 +237,10 @@ function App() {
     return <EmployerSubmissionPage />;
   }
 
+  if (view === 'privacy') {
+    return <PrivacyPolicyPage />;
+  }
+
   if (!session) {
     return <LoginScreen onLogin={setSession} />;
   }
@@ -237,6 +249,163 @@ function App() {
     localStorage.removeItem('jobtap_admin_token');
     setSession(null);
   }} />;
+}
+
+function PrivacyPolicyPage() {
+  return (
+    <main className="public-page">
+      <div className="public-shell">
+        <article className="public-card privacy-card">
+          <a className="text-link hero-back" href="/">
+            JobTap
+          </a>
+          <div className="privacy-hero">
+            <span className="eyebrow">Privacy Policy</span>
+            <h1>JobTap Privacy Policy</h1>
+            <p>
+              Effective date: June 2, 2026. JobTap helps users browse part-time job
+              listings and contact employers through external links. This Privacy
+              Policy explains what information we collect, how we use it, and how
+              users can contact us.
+            </p>
+          </div>
+
+          <section className="privacy-section">
+            <h2>Scope</h2>
+            <p>
+              This policy applies to the JobTap Android app and related JobTap services.
+              The current mobile app is Android-only. Mobile job seekers do not need to
+              create an account, log in, or submit a resume to use JobTap.
+            </p>
+          </section>
+
+          <section className="privacy-section">
+            <h2>Information We Collect</h2>
+            <h3>Anonymous Device Identifier</h3>
+            <p>
+              JobTap creates and stores an anonymous device identifier on your device.
+              We use this identifier to count unique app installations, deduplicate
+              analytics, and understand app usage. This identifier is not linked to a
+              JobTap user account because the mobile app does not have user accounts.
+            </p>
+            <h3>Country Code</h3>
+            <p>
+              JobTap uses a country code to show job listings relevant to your country.
+              The country code may come from your device region settings, request
+              metadata, or IP-based infrastructure headers when device region is
+              unavailable or invalid. JobTap does not collect precise GPS location in
+              the current mobile app.
+            </p>
+            <h3>App Analytics</h3>
+            <p>JobTap collects basic app interaction events, including:</p>
+            <ul>
+              <li><code>app_open</code></li>
+              <li><code>job_list_view</code></li>
+              <li><code>job_detail_view</code></li>
+              <li><code>contact_click</code></li>
+            </ul>
+            <p>
+              For <code>job_detail_view</code> and <code>contact_click</code>, JobTap may
+              include the related job ID. Analytics events may also include app version,
+              platform, locale, countryCode, anonymous deviceId, and source screen.
+            </p>
+          </section>
+
+          <section className="privacy-section">
+            <h2>Information We Do Not Collect From Mobile Job Seekers</h2>
+            <p>
+              JobTap does not require mobile job seekers to create an account. In the
+              current Android app, JobTap does not collect resumes, job applications,
+              profile photos, names, passwords, or job-seeker email addresses.
+            </p>
+          </section>
+
+          <section className="privacy-section">
+            <h2>External Contact Links</h2>
+            <p>
+              When you tap a contact link, JobTap opens an external app or website such
+              as phone, email, WhatsApp, Telegram, SMS, or a web page. Communication
+              with employers happens outside JobTap and may be governed by the privacy
+              policies of those external services.
+            </p>
+            <p>
+              JobTap records that the contact button was tapped for analytics and
+              deduplication. JobTap does not collect the contents of calls, emails, SMS
+              messages, chats, or conversations that happen outside the app.
+            </p>
+          </section>
+
+          <section className="privacy-section">
+            <h2>How We Use Information</h2>
+            <ul>
+              <li>Show job listings matched to your country.</li>
+              <li>Operate and secure the app.</li>
+              <li>Measure unique active users and job engagement.</li>
+              <li>Count job detail views and contact clicks.</li>
+              <li>Calculate aggregate contact click rates.</li>
+              <li>Improve app reliability and user experience.</li>
+              <li>Prevent spam, abuse, and duplicate analytics counting.</li>
+            </ul>
+          </section>
+
+          <section className="privacy-section">
+            <h2>Sharing</h2>
+            <p>
+              We do not sell mobile-user data. We do not share mobile-user data with
+              third-party advertising networks. Infrastructure providers may process
+              data only as needed to host, operate, secure, or monitor JobTap.
+            </p>
+          </section>
+
+          <section className="privacy-section">
+            <h2>Retention</h2>
+            <p>
+              Analytics and operational records are retained only as long as needed for
+              app operation, analytics, security, legal, or business purposes.
+            </p>
+          </section>
+
+          <section className="privacy-section">
+            <h2>Security</h2>
+            <p>
+              Production traffic uses HTTPS encryption in transit. Access to
+              administrative systems is limited to authorized operators.
+            </p>
+          </section>
+
+          <section className="privacy-section">
+            <h2>User Choices and Deletion Requests</h2>
+            <p>
+              Because the mobile app does not have user accounts, deletion requests may
+              require the anonymous device identifier or other information needed to
+              locate records. Users can contact us to request access or deletion.
+            </p>
+            <p>
+              Contact: <a href="mailto:privacy@jobtap.work">privacy@jobtap.work</a>
+            </p>
+          </section>
+
+          <section className="privacy-section">
+            <h2>Children</h2>
+            <p>
+              JobTap is intended for job seekers and employers. Final target audience
+              and age settings must be confirmed in Google Play Console before
+              publication.
+            </p>
+          </section>
+
+          <section className="privacy-section">
+            <h2>Changes</h2>
+            <p>
+              We may update this policy from time to time. The updated policy will be
+              published at <a href="https://jobtap.work/privacy">https://jobtap.work/privacy</a>
+              with a new effective date.
+            </p>
+          </section>
+        </article>
+      </div>
+    </main>
+  );
 }
 
 function LoginScreen({ onLogin }: { onLogin: (session: Session) => void }) {
@@ -311,8 +480,8 @@ function EmployerSubmissionPage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const resolvedCountryCode = resolveCountryCodeQuery(countryQuery, countryOptions) || form.countryCode;
-    if (!resolvedCountryCode && countryQuery.trim()) {
+    const resolvedCountryCode = resolveCountryCodeQuery(countryQuery, countryOptions);
+    if (!resolvedCountryCode) {
       setErrors((current) => ({ ...current, countryCode: '请从下拉中选择一个国家' }));
       return;
     }
@@ -912,7 +1081,7 @@ function StatisticsPage({ token }: { token: string }) {
         <MetricCard label="国家活跃人数" value={countryActiveUsers.toLocaleString()} />
         <MetricCard label="浏览详情人数" value={totals.detailViews.toLocaleString()} />
         <MetricCard label="点击联系人数" value={totals.contactClicks.toLocaleString()} />
-        <MetricCard label="平均联系点击率" value={`${(averageRate * 100).toFixed(1)}%`} />
+        <MetricCard label="联系点击率" value={`${(averageRate * 100).toFixed(1)}%`} />
       </div>
       <div className="panel">
         <TableToolbar title="统计明细" meta={`${items.length} 条`} />
@@ -920,7 +1089,7 @@ function StatisticsPage({ token }: { token: string }) {
           <thead>
             <tr>
               <th>国家</th>
-              <th>岗位 ID</th>
+              <th>岗位id</th>
               <th>活跃人数</th>
               <th>浏览详情人数</th>
               <th>点击联系人数</th>

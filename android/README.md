@@ -60,7 +60,7 @@ The debug manifest (`src/debug/AndroidManifest.xml`) enables cleartext HTTP traf
 Release builds default to the planned production API host:
 
 ```
-https://api.jobtap.app
+https://api.jobtap.work
 ```
 
 Override the release URL with a Gradle property:
@@ -76,7 +76,7 @@ Or set either `org.gradle.project.releaseApiUrl=https://your-production-api.com`
 Before submitting a release, confirm the final API domain:
 
 ```bash
-curl -I https://api.jobtap.app/api/mobile/bootstrap
+curl -I https://api.jobtap.work/api/mobile/bootstrap
 ```
 
 The domain must resolve publicly, use a valid HTTPS certificate, and return the expected backend response from mobile networks.
@@ -137,7 +137,7 @@ For Google Play, build the signed app bundle with the approved upload key:
 
 ```bash
 ./gradlew clean :app:bundleRelease \
-  -PreleaseApiUrl=https://api.jobtap.app \
+  -PreleaseApiUrl=https://api.jobtap.work \
   -PrequireReleaseSigning=true
 ```
 
