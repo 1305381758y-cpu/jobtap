@@ -1,0 +1,73 @@
+name: Module C CI
+
+on:
+  push:
+    branches:
+      - jobtap-module-c
+  pull_request:
+
+jobs:
+  backend-admin:
+    name: Backend and admin console
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install backend dependencies
+        run: npm ci
+
+      - name: Install admin dependencies
+        run: npm --prefix frontend ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build backend
+        run: npm run build
+
+      - name: Build admin console
+        run: npm run admin:build
+
+      - name: Audit backend production dependencies
+        run: npm audit --omit=dev
+
+      - name: Audit admin production dependencies
+        run: npm --prefix frontend audit --omit=dev
+
+  android:
+    name: Android debug build and tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run Android unit tests
+        working-directory: android
+        run: ./gradlew testDebugUnitTest
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew :app:assembleDebug
+
+      - name: Validate release build configuration
+        working-directory: android
+        run: ./gradlew :app:assembleRelease -PreleaseApiUrl=https://api.jobtap.app

@@ -1,0 +1,84 @@
+<resources>
+    <!-- App -->
+    <string name="app_name">JobTap</string>
+    <string name="locale_marker">zh</string>
+
+    <!-- Navigation (AppTab labels) -->
+    <string name="tab_jobs">职位</string>
+    <string name="tab_jobs_icon">J</string>
+    <string name="tab_settings">设置</string>
+    <string name="tab_settings_icon">S</string>
+
+    <!-- Legal documents -->
+    <string name="legal_terms_title">服务条款</string>
+    <string name="legal_privacy_title">隐私政策</string>
+    <string name="legal_back">返回</string>
+
+    <!-- Terms paragraphs -->
+    <string name="terms_para_1">JobTap 是一个连接用户与兼职工作机会的平台。使用本应用即表示您同意以下条款和条件。</string>
+    <string name="terms_para_2">JobTap 会打开外部联系链接，以便用户直接与雇主沟通。我们不处理任何应用内的申请、面试或招聘决定。所有沟通和招聘过程均在应用外进行。</string>
+    <string name="terms_para_3">JobTap 仅作为职位列表目录。我们不对任何职位信息的准确性做出认可、保证或验证。用户在联系雇主时应谨慎行事并自行核实。</string>
+    <string name="terms_para_4">我们保留随时更新这些条款的权利。更改后继续使用本应用即表示您接受更新后的条款。</string>
+
+    <!-- Privacy paragraphs -->
+    <string name="privacy_para_1">本隐私政策说明了 JobTap 如何收集、使用和保护您的信息。</string>
+    <string name="privacy_para_2">我们收集匿名设备标识符以区分应用的不同安装。该标识符在您的设备上本地生成，不与任何个人身份信息关联。</string>
+    <string name="privacy_para_3">我们根据您的设备区域和系统设置检测您的国家代码。此设备区域国家首先用于提供相关的职位列表。如果您的设备区域不可用或无效，我们可能会使用请求元数据或 IP 地址作为辅助备用。此信息用于向您展示与您所在地区相关的职位信息。</string>
+    <string name="privacy_para_4">我们收集基本的应用分析数据，包括以下事件类型：应用打开（app_open）、职位列表查看（job_list_view）、职位详情查看（job_detail_view）和联系链接点击（contact_click）。这些数据有助于我们改进应用并了解使用模式。</string>
+    <string name="privacy_para_5">在当前 MVP（最小可行产品）版本中，没有账户系统。您无需创建账户、提供电子邮件地址或设置密码即可使用 JobTap。</string>
+    <string name="privacy_para_6">我们不会收集您的姓名、电子邮件地址、电话号码或任何其他个人身份信息。我们不会为营销目的与第三方共享您的数据。</string>
+
+    <!-- Jobs screen -->
+    <string name="jobs_title">可用职位</string>
+    <string name="jobs_subtitle">适合您所在国家的兼职机会</string>
+    <string name="jobs_loading">正在加载职位...</string>
+    <string name="jobs_error_refresh">无法刷新职位，请重试。</string>
+    <string name="jobs_error_load">无法加载职位，请重试。</string>
+    <string name="jobs_error_load_more">无法加载更多职位，请重试。</string>
+    <string name="jobs_empty_title">暂无职位</string>
+    <string name="jobs_empty_body">您所在国家已审核通过的职位将显示在这里。</string>
+    <string name="jobs_loading_more">正在加载更多职位...</string>
+    <string name="jobs_load_more">加载更多</string>
+    <string name="jobs_no_more">没有更多职位了</string>
+    <string name="jobs_retry">重试</string>
+    <string name="jobs_country_auto_note">正在展示根据自动识别国家匹配的职位。国家区域不可手动选择。</string>
+
+    <!-- Job detail screen -->
+    <string name="detail_title">职位详情</string>
+    <string name="detail_loading">正在加载职位详情...</string>
+    <string name="detail_error">无法加载职位详情，请重试。</string>
+    <string name="detail_contact_button">联系雇主</string>
+    <string name="detail_unable_to_open">无法打开联系链接</string>
+
+    <!-- Detail panel labels -->
+    <string name="label_salary">薪资</string>
+    <string name="label_work_time">工作时间</string>
+    <string name="label_work_mode">工作模式</string>
+    <string name="label_area">地区</string>
+    <string name="label_time">时间</string>
+
+    <!-- Description section -->
+    <string name="detail_description">职位描述</string>
+
+    <!-- Settings screen -->
+    <string name="settings_title">设置</string>
+    <string name="settings_language_label">语言</string>
+    <string name="settings_language_value">中文</string>
+    <string name="settings_privacy_policy">隐私政策</string>
+    <string name="settings_terms">服务条款</string>
+    <string name="settings_app_version">应用版本</string>
+
+    <!-- Country detection -->
+    <string name="country_loading_title">JobTap</string>
+    <string name="country_loading_message">正在检测您的国家...</string>
+    <string name="country_failure_title">需要位置信息</string>
+    <string name="country_failure_body">我们需要知道您的国家以显示可用的职位。请检查您的网络连接或系统区域设置。</string>
+    <string name="country_retry">重试</string>
+
+    <!-- Remote / Local badges -->
+    <string name="badge_remote">远程</string>
+    <string name="badge_local">本地</string>
+
+    <!-- Time labels -->
+    <string name="posted_recently">最近发布</string>
+</resources>

@@ -1,0 +1,12 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": ".",
+  "roots": ["<rootDir>/test"],
+  "modulePathIgnorePatterns": ["<rootDir>/.worktrees/"],
+  "testPathIgnorePatterns": ["<rootDir>/.worktrees/"],
+  "testEnvironment": "node",
+  "testRegex": ".e2e-spec.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  }
+}
